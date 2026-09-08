@@ -10,7 +10,7 @@ body {
     height: 100%;
     overflow: hidden;
 
-    background: #080808;
+    background: #000;
     font-family: Arial, sans-serif;
 }
 
@@ -43,8 +43,8 @@ h1 {
     font-size: 40px;
 
     text-shadow:
-        0 0 5px #a855f7,
-        0 0 15px #a855f7;
+    0 0 5px #00ff66,
+    0 0 15px #00ff66;
 }
 
 button {
