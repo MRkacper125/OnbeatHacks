@@ -81,7 +81,7 @@ function drawMatrix() {
         );
 
         // szybkość spadania
-        drops[i] += 0.2;
+        drops[i] += 5;
 
         if (drops[i] > canvas.height) {
 
