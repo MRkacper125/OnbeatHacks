@@ -99,7 +99,7 @@ function drawMatrix() {
 setupMatrix();
 
 // większa liczba = wolniejsza animacja
-setInterval(drawMatrix, 100);
+setInterval(drawMatrix, 75);
 
 window.addEventListener(
     "resize",
