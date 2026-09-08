@@ -25,14 +25,20 @@ function drawMatrix(timestamp) {
     if (timestamp - lastTime > speed) {
         lastTime = timestamp;
 
-        ctx.fillStyle = "rgba(0, 0, 0, 0.18)";
+        // Najpierw wyłączamy zielony glow
+        ctx.shadowBlur = 0;
+        ctx.shadowColor = "transparent";
+
+        // Przyciemniamy stare znaki czernią
+        ctx.fillStyle = "rgba(0, 0, 0, 0.35)";
         ctx.fillRect(0, 0, canvas.width, canvas.height);
 
+        // Dopiero teraz zielone cyfry
         ctx.fillStyle = "#00ff66";
         ctx.font = fontSize + "px monospace";
 
         ctx.shadowColor = "#00ff66";
-        ctx.shadowBlur = 6;
+        ctx.shadowBlur = 5;
 
         for (let i = 0; i < drops.length; i++) {
             if (Math.random() > 0.55) {
@@ -41,9 +47,7 @@ function drawMatrix(timestamp) {
 
             const character =
                 characters[
-                    Math.floor(
-                        Math.random() * characters.length
-                    )
+                    Math.floor(Math.random() * characters.length)
                 ];
 
             const x = i * 35;
