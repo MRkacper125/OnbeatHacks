@@ -9,17 +9,14 @@ body {
 h1 {
     text-align: center;
     color: #a855f7;
-    margin-top: 20px;
+    margin-top: 10px;
     font-size: 40px;
 }
 
-p {
-    text-align: center;
-}
-
 button {
-    margin-top: 40px;
-    margin-left: 20px;
+    position: absolute;
+    left: 10px;
+    top: 120px;
 
     padding: 12px 20px;
     font-size: 18px;
