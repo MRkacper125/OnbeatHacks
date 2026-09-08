@@ -10,12 +10,13 @@ body {
     height: 100%;
     overflow: hidden;
 
-    background: #000;
+    background: #000000;
     font-family: Arial, sans-serif;
 }
 
 #matrix {
     position: fixed;
+
     top: 0;
     left: 0;
 
@@ -39,15 +40,15 @@ h1 {
 
     z-index: 10;
 
-    color: #00c853;
+    color: #00b84f;
 
     font-size: 40px;
 
     -webkit-text-stroke: 1px rgba(0, 0, 0, 0.7);
 
     text-shadow:
-        0 0 3px #00c853,
-        0 0 8px rgba(0, 200, 83, 0.45);
+        0 0 2px #00b84f,
+        0 0 6px rgba(0, 184, 79, 0.35);
 }
 
 button {
