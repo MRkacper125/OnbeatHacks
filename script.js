@@ -5,9 +5,9 @@ const characters = "01ABCDEF";
 const fontSize = 18;
 
 const columnGap = 42;
-const speed = 0.28;
+const speed = 0.08;
 
-let drops = [];
+drops[i] += speed;
 
 function setupCanvas() {
     canvas.width = window.innerWidth;
@@ -27,7 +27,7 @@ function setupCanvas() {
 
 function drawMatrix() {
     ctx.shadowBlur = 0;
-    ctx.fillStyle = "rgba(0, 0, 0, 0.16)";
+    ctx.fillStyle = "rgba(0, 0, 0, 0.08)";
     ctx.fillRect(0, 0, canvas.width, canvas.height);
 
     ctx.fillStyle = "#00b84f";
