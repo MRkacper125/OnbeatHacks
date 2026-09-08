@@ -39,13 +39,15 @@ h1 {
 
     z-index: 10;
 
-    color: #00ff66;
+    color: #00c853;
 
     font-size: 40px;
 
+    -webkit-text-stroke: 1px rgba(0, 0, 0, 0.7);
+
     text-shadow:
-    0 0 5px #00ff66,
-    0 0 15px #00ff66;
+        0 0 3px #00c853,
+        0 0 8px rgba(0, 200, 83, 0.45);
 }
 
 button {
