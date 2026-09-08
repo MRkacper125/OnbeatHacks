@@ -2,56 +2,89 @@ const canvas = document.getElementById("matrix");
 const ctx = canvas.getContext("2d");
 
 const characters = "01ABCDEF";
+
 const fontSize = 18;
+const columnGap = 70;
 
-const columnGap = 42;
-const speed = 0.08;
+// im większe, tym wolniej
+const frameDelay = 90;
 
-drops[i] += speed;
+// ile rzędu przesuwa się przy jednym kroku
+const fallSpeed = 0.18;
+
+let drops = [];
+let lastFrame = 0;
 
 function setupCanvas() {
     canvas.width = window.innerWidth;
     canvas.height = window.innerHeight;
 
-    const columns = Math.floor(canvas.width / columnGap);
+    ctx.fillStyle = "#000000";
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    const columns = Math.ceil(canvas.width / columnGap);
 
     drops = [];
 
     for (let i = 0; i < columns; i++) {
-        drops[i] = Math.random() * -60;
+        drops[i] = Math.random() * -70;
     }
-
-    ctx.fillStyle = "#000000";
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
 }
 
-function drawMatrix() {
-    ctx.shadowBlur = 0;
-    ctx.fillStyle = "rgba(0, 0, 0, 0.08)";
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
+function drawMatrix(timestamp) {
 
-    ctx.fillStyle = "#00b84f";
-    ctx.font = fontSize + "px monospace";
+    if (timestamp - lastFrame >= frameDelay) {
+        lastFrame = timestamp;
 
-    ctx.shadowColor = "#00b84f";
-    ctx.shadowBlur = 2;
+        // delikatnie wygaszamy stare znaki
+        ctx.shadowBlur = 0;
 
-    for (let i = 0; i < drops.length; i++) {
-        const character =
-            characters[
-                Math.floor(Math.random() * characters.length)
-            ];
+        ctx.fillStyle = "rgba(0, 0, 0, 0.10)";
+        ctx.fillRect(
+            0,
+            0,
+            canvas.width,
+            canvas.height
+        );
 
-        const x = i * columnGap;
-        const y = drops[i] * fontSize;
+        ctx.fillStyle = "#009b3f";
 
-        ctx.fillText(character, x, y);
+        ctx.font =
+            fontSize + "px monospace";
 
-        drops[i] += speed;
+        ctx.shadowColor = "#00b84f";
+        ctx.shadowBlur = 2;
 
-        if (y > canvas.height) {
-            if (Math.random() > 0.985) {
-                drops[i] = Math.random() * -30;
+        for (let i = 0; i < drops.length; i++) {
+
+            const character =
+                characters[
+                    Math.floor(
+                        Math.random() *
+                        characters.length
+                    )
+                ];
+
+            const x =
+                i * columnGap;
+
+            const y =
+                drops[i] * fontSize;
+
+            ctx.fillText(
+                character,
+                x,
+                y
+            );
+
+            drops[i] += fallSpeed;
+
+            if (y > canvas.height) {
+
+                if (Math.random() > 0.97) {
+                    drops[i] =
+                        Math.random() * -50;
+                }
             }
         }
     }
@@ -60,12 +93,20 @@ function drawMatrix() {
 }
 
 setupCanvas();
-drawMatrix();
 
-window.addEventListener("resize", setupCanvas);
+requestAnimationFrame(drawMatrix);
 
-const button = document.getElementById("testButton");
+window.addEventListener(
+    "resize",
+    setupCanvas
+);
 
-button.addEventListener("click", function () {
-    alert("działa!");
-});
+const kabelkiButton =
+    document.getElementById("Kabelki");
+
+kabelkiButton.addEventListener(
+    "click",
+    function () {
+        alert("Kabelki");
+    }
+);

@@ -16,7 +16,6 @@ body {
 
 #matrix {
     position: fixed;
-
     top: 0;
     left: 0;
 
@@ -40,15 +39,15 @@ h1 {
 
     z-index: 10;
 
-    color: #00b84f;
+    color: #00a844;
 
     font-size: 40px;
 
-    -webkit-text-stroke: 1px rgba(0, 0, 0, 0.7);
+    -webkit-text-stroke: 1px rgba(0, 0, 0, 0.75);
 
     text-shadow:
-        0 0 2px #00b84f,
-        0 0 6px rgba(0, 184, 79, 0.35);
+        0 0 2px #00a844,
+        0 0 5px rgba(0, 168, 68, 0.35);
 }
 
 button {
@@ -59,42 +58,47 @@ button {
 
     z-index: 10;
 
-    padding: 14px 28px;
+    min-width: 130px;
 
-    font-size: 17px;
-    font-weight: bold;
-    letter-spacing: 1px;
+    padding: 14px 22px;
 
     color: #00c853;
 
-    background: rgba(0, 0, 0, 0.85);
+    background: rgba(0, 10, 5, 0.92);
 
-    border: 1px solid #00c853;
+    border: 1px solid #00a844;
     border-radius: 6px;
+
+    font-family: monospace;
+    font-size: 16px;
+    font-weight: bold;
+
+    letter-spacing: 1px;
 
     cursor: pointer;
 
     box-shadow:
-        0 0 5px rgba(0, 200, 83, 0.5),
-        inset 0 0 5px rgba(0, 200, 83, 0.15);
+        0 0 5px rgba(0, 200, 83, 0.35),
+        inset 0 0 7px rgba(0, 200, 83, 0.08);
 
     text-shadow:
-        0 0 4px rgba(0, 200, 83, 0.7);
+        0 0 3px rgba(0, 200, 83, 0.55);
 
     transition: 0.2s;
 }
 
 button:hover {
-    background: #00c853;
-    color: #000000;
+    background: #002814;
+
+    border-color: #00c853;
 
     box-shadow:
-        0 0 8px #00c853,
-        0 0 18px rgba(0, 200, 83, 0.7);
+        0 0 9px rgba(0, 200, 83, 0.55),
+        inset 0 0 10px rgba(0, 200, 83, 0.12);
 
-    transform: translateY(-2px);
+    transform: translateX(3px);
 }
 
 button:active {
-    transform: translateY(0px) scale(0.97);
+    transform: translateX(3px) scale(0.97);
 }
