@@ -12,6 +12,9 @@ function setupCanvas() {
     canvas.width = window.innerWidth;
     canvas.height = window.innerHeight;
 
+    ctx.fillStyle = "#000000";
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
     const columns = Math.ceil(canvas.width / 35);
 
     drops = [];
