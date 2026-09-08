@@ -1,59 +1,97 @@
 const canvas = document.getElementById("matrix");
 const ctx = canvas.getContext("2d");
 
+const characters =
+    "01ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789#$%&@";
+
 const fontSize = 18;
-const chars = "01ABCDEF#$%&@";
 
 let drops = [];
 
-function resizeCanvas() {
+function setupCanvas() {
+
     canvas.width = window.innerWidth;
     canvas.height = window.innerHeight;
 
-    const columns = Math.floor(canvas.width / fontSize);
+    const columns = Math.ceil(canvas.width / fontSize);
 
     drops = [];
 
     for (let i = 0; i < columns; i++) {
+
         drops[i] = Math.random() * -50;
+
     }
 }
 
 function drawMatrix() {
-    ctx.fillStyle = "rgba(17, 17, 17, 0.12)";
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    ctx.fillStyle = "rgba(8, 8, 8, 0.12)";
+    ctx.fillRect(
+        0,
+        0,
+        canvas.width,
+        canvas.height
+    );
 
     ctx.fillStyle = "#a855f7";
+
     ctx.font = fontSize + "px monospace";
 
+    ctx.shadowColor = "#a855f7";
+    ctx.shadowBlur = 8;
+
     for (let i = 0; i < drops.length; i++) {
-        const char =
-            chars[Math.floor(Math.random() * chars.length)];
+
+        const character =
+            characters[
+                Math.floor(
+                    Math.random() * characters.length
+                )
+            ];
 
         const x = i * fontSize;
+
         const y = drops[i] * fontSize;
 
-        ctx.fillText(char, x, y);
+        ctx.fillText(
+            character,
+            x,
+            y
+        );
 
         if (
             y > canvas.height &&
             Math.random() > 0.97
         ) {
+
             drops[i] = 0;
+
         }
 
         drops[i]++;
+
     }
+
+    requestAnimationFrame(drawMatrix);
 }
 
-resizeCanvas();
+setupCanvas();
+drawMatrix();
 
-window.addEventListener("resize", resizeCanvas);
+window.addEventListener(
+    "resize",
+    setupCanvas
+);
 
-setInterval(drawMatrix, 50);
+const button =
+    document.getElementById("testButton");
 
-const button = document.getElementById("testButton");
+button.addEventListener(
+    "click",
+    function () {
 
-button.addEventListener("click", function () {
-    alert("działa!");
-});
+        alert("działa!");
+
+    }
+);
