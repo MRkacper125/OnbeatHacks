@@ -81,7 +81,7 @@ function drawMatrix() {
         );
 
         // szybkość spadania
-        drops[i] += 2;
+        drops[i] += 4;
 
         if (drops[i] > canvas.height) {
 
@@ -99,7 +99,7 @@ function drawMatrix() {
 setupMatrix();
 
 // większa liczba = wolniejsza animacja
-setInterval(drawMatrix, 250);
+setInterval(drawMatrix, 150);
 
 window.addEventListener(
     "resize",
