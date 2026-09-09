@@ -3,13 +3,12 @@ const ctx = canvas.getContext("2d");
 
 const characters = "01ABCDEF";
 
-const fontSize = 18;
+const fontSize = 20;
 const columnGap = 80;
 
 let drops = [];
 
 function setupMatrix() {
-
     canvas.width = window.innerWidth;
     canvas.height = window.innerHeight;
 
@@ -19,14 +18,11 @@ function setupMatrix() {
     drops = [];
 
     for (let i = 0; i < columns; i++) {
-
-        drops.push(
-            Math.random() * -canvas.height
-        );
-
+        drops[i] =
+            Math.random() * -canvas.height;
     }
 
-    ctx.fillStyle = "black";
+    ctx.fillStyle = "#000000";
 
     ctx.fillRect(
         0,
@@ -41,7 +37,7 @@ function drawMatrix() {
     ctx.shadowBlur = 0;
 
     ctx.fillStyle =
-        "rgba(0, 0, 0, 0.12)";
+        "rgba(0, 0, 0, 0.14)";
 
     ctx.fillRect(
         0,
@@ -50,17 +46,17 @@ function drawMatrix() {
         canvas.height
     );
 
+    ctx.fillStyle = "#009b3f";
+
     ctx.font =
         fontSize + "px monospace";
 
-    ctx.fillStyle = "#009b3f";
-
     ctx.shadowColor = "#00b84f";
-    ctx.shadowBlur = 2;
+    ctx.shadowBlur = 1;
 
     for (let i = 0; i < drops.length; i++) {
 
-        const char =
+        const character =
             characters[
                 Math.floor(
                     Math.random() *
@@ -75,13 +71,13 @@ function drawMatrix() {
             drops[i];
 
         ctx.fillText(
-            char,
+            character,
             x,
             y
         );
 
-        // szybkość spadania
-        drops[i] += 0.02;
+        // SZYBKOŚĆ SPADANIA
+        drops[i] += 2;
 
         if (drops[i] > canvas.height) {
 
@@ -91,29 +87,16 @@ function drawMatrix() {
                     Math.random() * -300;
 
             }
-
         }
     }
 }
 
 setupMatrix();
 
-// większa liczba = wolniejsza animacja
+// JAK CZĘSTO ZMIENIAJĄ SIĘ ZNAKI
 setInterval(drawMatrix, 100);
 
 window.addEventListener(
     "resize",
     setupMatrix
-);
-
-const button =
-    document.getElementById("Kabelki");
-
-button.addEventListener(
-    "click",
-    function () {
-
-        alert("Kabelki");
-
-    }
 );
