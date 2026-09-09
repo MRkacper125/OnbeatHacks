@@ -34,8 +34,24 @@ const restartButton =
 const timeInput =
     document.getElementById("timeInput");
 
+
+// ==========================================
+// USTAWIENIA GRY
+// ==========================================
+
 const RINGS = 5;
-const SEGMENTS = 16;
+
+// więcej pozycji na pierścieniu = gęstszy wygląd
+const SEGMENTS = 32;
+
+// promienie od ZEWNĘTRZNEGO do WEWNĘTRZNEGO
+const RADII = [
+    245,
+    198,
+    151,
+    104,
+    62
+];
 
 let mode = "easy";
 
@@ -45,19 +61,20 @@ let lives = 3;
 
 let gameOver = false;
 
-let rotations = [];
-
-let correctRotations = [];
-
-let alternativeRotations = [];
-
-let confirmedRotations = [];
+let gameTime = 15000;
 
 let startTime = 0;
 
-let gameTime = 15000;
-
 let timerAnimation = null;
+
+
+// każdy pierścień ma własne dane
+let rings = [];
+
+
+// ==========================================
+// POMOCNICZE
+// ==========================================
 
 function randomInt(max) {
     return Math.floor(
@@ -65,7 +82,16 @@ function randomInt(max) {
     );
 }
 
-function normalizeRotation(value) {
+
+function clamp(value, min, max) {
+    return Math.max(
+        min,
+        Math.min(max, value)
+    );
+}
+
+
+function normalize(value) {
     let result =
         value % SEGMENTS;
 
@@ -76,6 +102,35 @@ function normalizeRotation(value) {
     return result;
 }
 
+
+function shuffle(array) {
+    const copy = [...array];
+
+    for (
+        let i = copy.length - 1;
+        i > 0;
+        i--
+    ) {
+        const j =
+            randomInt(i + 1);
+
+        [
+            copy[i],
+            copy[j]
+        ] = [
+            copy[j],
+            copy[i]
+        ];
+    }
+
+    return copy;
+}
+
+
+// ==========================================
+// CZAS
+// ==========================================
+
 function getSelectedTime() {
     let seconds =
         Number(timeInput.value);
@@ -85,12 +140,10 @@ function getSelectedTime() {
     }
 
     seconds =
-        Math.max(
+        clamp(
+            seconds,
             5,
-            Math.min(
-                120,
-                seconds
-            )
+            120
         );
 
     timeInput.value =
@@ -99,7 +152,135 @@ function getSelectedTime() {
     return seconds * 1000;
 }
 
+
+// ==========================================
+// GENEROWANIE PIERŚCIENIA
+// ==========================================
+
+function createRing(index) {
+
+    // im dalszy pierścień, tym może być
+    // trochę więcej elementów
+    const minTargets =
+        index === 0 ? 4 : 3;
+
+    const maxTargets =
+        index === 0 ? 6 : 5;
+
+    const targetCount =
+        minTargets +
+        randomInt(
+            maxTargets -
+            minTargets +
+            1
+        );
+
+
+    // tworzymy kilka pozycji celu
+    const available = [];
+
+    for (
+        let i = 0;
+        i < SEGMENTS;
+        i++
+    ) {
+        available.push(i);
+    }
+
+    const shuffled =
+        shuffle(available);
+
+    const targets =
+        shuffled
+            .slice(0, targetCount)
+            .sort(
+                (a, b) => a - b
+            );
+
+
+    /*
+        movingOffsets to układ czerwonych
+        elementów.
+
+        Przesuwają się wszystkie razem.
+
+        Przy correctRotation wszystkie
+        pokrywają się z targets.
+    */
+
+    const correctRotation =
+        randomInt(SEGMENTS);
+
+    const movingOffsets =
+        targets.map(
+            target =>
+                normalize(
+                    target -
+                    correctRotation
+                )
+        );
+
+
+    // pozycja początkowa nie powinna
+    // od razu być poprawna
+    let rotation =
+        randomInt(SEGMENTS);
+
+    while (
+        rotation === correctRotation
+    ) {
+        rotation =
+            randomInt(SEGMENTS);
+    }
+
+
+    // HARD dostaje drugie "niebieskie"
+    // ustawienie, które może być fałszywe
+    let fakeRotation = null;
+
+    if (mode === "hard") {
+
+        fakeRotation =
+            randomInt(SEGMENTS);
+
+        while (
+            fakeRotation ===
+                correctRotation ||
+            fakeRotation === rotation
+        ) {
+            fakeRotation =
+                randomInt(SEGMENTS);
+        }
+    }
+
+
+    return {
+        targets: targets,
+
+        movingOffsets:
+            movingOffsets,
+
+        correctRotation:
+            correctRotation,
+
+        fakeRotation:
+            fakeRotation,
+
+        rotation:
+            rotation,
+
+        confirmedRotation:
+            null
+    };
+}
+
+
+// ==========================================
+// START / RESTART
+// ==========================================
+
 function setupGame() {
+
     if (timerAnimation) {
         cancelAnimationFrame(
             timerAnimation
@@ -115,40 +296,15 @@ function setupGame() {
 
     gameOver = false;
 
-    rotations = [];
+    rings = [];
 
-    correctRotations = [];
-
-    alternativeRotations = [];
-
-    confirmedRotations = [];
-
-    for (let i = 0; i < RINGS; i++) {
-
-        rotations.push(
-            randomInt(SEGMENTS)
-        );
-
-        correctRotations.push(
-            randomInt(SEGMENTS)
-        );
-
-        let fake =
-            randomInt(SEGMENTS);
-
-        while (
-            fake === correctRotations[i]
-        ) {
-            fake =
-                randomInt(SEGMENTS);
-        }
-
-        alternativeRotations.push(
-            fake
-        );
-
-        confirmedRotations.push(
-            null
+    for (
+        let i = 0;
+        i < RINGS;
+        i++
+    ) {
+        rings.push(
+            createRing(i)
         );
     }
 
@@ -162,6 +318,8 @@ function setupGame() {
 
     updateUI();
 
+    resizeCanvas();
+
     draw();
 
     timerAnimation =
@@ -170,7 +328,13 @@ function setupGame() {
         );
 }
 
+
+// ==========================================
+// UI
+// ==========================================
+
 function updateUI() {
+
     stageText.textContent =
         (currentRing + 1) +
         "/" +
@@ -190,52 +354,70 @@ function updateUI() {
     );
 }
 
-function isBluePosition(ringIndex) {
+
+// ==========================================
+// SPRAWDZANIE POZYCJI
+// ==========================================
+
+function isBluePosition(
+    ringIndex
+) {
+    const ring =
+        rings[ringIndex];
+
     const current =
-        normalizeRotation(
-            rotations[ringIndex]
+        normalize(
+            ring.rotation
         );
 
-    const correct =
-        correctRotations[
-            ringIndex
-        ];
-
-    if (mode === "easy") {
-        return (
-            current === correct
-        );
+    if (
+        current ===
+        ring.correctRotation
+    ) {
+        return true;
     }
 
-    const fake =
-        alternativeRotations[
-            ringIndex
-        ];
+    if (
+        mode === "hard" &&
+        current ===
+        ring.fakeRotation
+    ) {
+        return true;
+    }
 
-    return (
-        current === correct ||
-        current === fake
-    );
+    return false;
 }
+
 
 function isActuallyCorrect(
     ringIndex,
     rotation
 ) {
     return (
-        normalizeRotation(rotation) ===
-        correctRotations[ringIndex]
+        normalize(rotation) ===
+        rings[ringIndex]
+            .correctRotation
     );
 }
 
-function rotateCurrent(direction) {
+
+// ==========================================
+// OBRACANIE
+// ==========================================
+
+function rotateCurrent(
+    direction
+) {
     if (gameOver) {
         return;
     }
 
-    rotations[currentRing] =
-        normalizeRotation(
-            rotations[currentRing] +
+    const ring =
+        rings[currentRing];
+
+    ring.rotation =
+        normalize(
+            ring.rotation +
             direction
         );
 
@@ -244,29 +426,41 @@ function rotateCurrent(direction) {
     draw();
 }
 
+
+// ==========================================
+// ZATWIERDZANIE
+// ==========================================
+
 function confirmCurrent() {
+
     if (gameOver) {
         return;
     }
 
+    const ring =
+        rings[currentRing];
+
     if (
-        !isBluePosition(currentRing)
+        !isBluePosition(
+            currentRing
+        )
     ) {
         status.textContent =
-            "Musisz ustawić pierścień na niebiesko.";
+            "Najpierw dopasuj układ na niebiesko.";
 
         status.style.color =
-            "#ff4545";
+            "#e24d4d";
 
         return;
     }
 
-    confirmedRotations[
-        currentRing
-    ] =
-        rotations[currentRing];
+
+    ring.confirmedRotation =
+        ring.rotation;
+
 
     status.textContent = "";
+
 
     if (
         currentRing <
@@ -281,49 +475,67 @@ function confirmCurrent() {
         return;
     }
 
+
     checkFinalSolution();
 }
 
+
+// ==========================================
+// HARD / SPRAWDZENIE KOŃCOWE
+// ==========================================
+
 function checkFinalSolution() {
+
     const allCorrect =
-        confirmedRotations.every(
-            (rotation, index) =>
+        rings.every(
+            (ring, index) =>
                 isActuallyCorrect(
                     index,
-                    rotation
+                    ring.confirmedRotation
                 )
         );
 
+
     if (allCorrect) {
+
         gameOver = true;
 
         status.textContent =
             "SUCCESS";
 
         status.style.color =
-            "#00d56a";
+            "#28d980";
 
         return;
     }
+
 
     if (mode === "hard") {
+
         status.textContent =
-            "Układ nie pasuje. Cofnij i popraw wcześniejszy pierścień.";
+            "Układ nie pasuje — cofnij się i wybierz inne niebieskie ustawienie.";
 
         status.style.color =
-            "#ff9a33";
+            "#f0a13a";
 
         return;
     }
+
 
     status.textContent =
         "Błędny układ";
 
     status.style.color =
-        "#ff4545";
+        "#e24d4d";
 }
 
+
+// ==========================================
+// COFANIE
+// ==========================================
+
 function backStep() {
+
     if (
         gameOver ||
         currentRing <= 0
@@ -331,107 +543,344 @@ function backStep() {
         return;
     }
 
-    confirmedRotations[
-        currentRing
-    ] = null;
+
+    rings[currentRing]
+        .confirmedRotation =
+        null;
+
 
     currentRing--;
 
-    confirmedRotations[
-        currentRing
-    ] = null;
+
+    rings[currentRing]
+        .confirmedRotation =
+        null;
+
 
     status.textContent =
-        "Cofnięto o jeden etap.";
+        "Cofnięto o jeden pierścień.";
 
     status.style.color =
         "#e48a24";
+
 
     updateUI();
 
     draw();
 }
 
-function drawRing(
+
+// ==========================================
+// CANVAS
+// ==========================================
+
+function resizeCanvas() {
+
+    const rect =
+        canvas.getBoundingClientRect();
+
+    const dpr =
+        window.devicePixelRatio || 1;
+
+    canvas.width =
+        Math.round(
+            rect.width * dpr
+        );
+
+    canvas.height =
+        Math.round(
+            rect.height * dpr
+        );
+
+    ctx.setTransform(
+        dpr,
+        0,
+        0,
+        dpr,
+        0,
+        0
+    );
+
+    draw();
+}
+
+
+// ==========================================
+// RYSOWANIE CIENKIEGO PIERŚCIENIA
+// ==========================================
+
+function drawBaseRing(
     cx,
     cy,
     radius,
-    thickness,
-    ringIndex
+    active
 ) {
-    const step =
-        Math.PI * 2 /
-        SEGMENTS;
+
+    ctx.beginPath();
+
+    ctx.arc(
+        cx,
+        cy,
+        radius,
+        0,
+        Math.PI * 2
+    );
+
+    ctx.strokeStyle =
+        active
+            ? "#35404a"
+            : "#242933";
+
+    ctx.lineWidth =
+        active ? 3 : 2;
+
+    ctx.stroke();
+}
+
+
+// ==========================================
+// MAŁY SEGMENT NA PIERŚCIENIU
+// ==========================================
+
+function drawSegment(
+    cx,
+    cy,
+    radius,
+    position,
+    color,
+    width = 10,
+    length = 18,
+    glow = 0
+) {
+
+    const angle =
+        (
+            position /
+            SEGMENTS
+        ) *
+        Math.PI *
+        2
+        -
+        Math.PI / 2;
+
+
+    const x =
+        cx +
+        Math.cos(angle) *
+        radius;
+
+    const y =
+        cy +
+        Math.sin(angle) *
+        radius;
+
+
+    ctx.save();
+
+    ctx.translate(
+        x,
+        y
+    );
+
+    ctx.rotate(
+        angle +
+        Math.PI / 2
+    );
+
+
+    ctx.fillStyle =
+        color;
+
+
+    if (glow > 0) {
+        ctx.shadowColor =
+            color;
+
+        ctx.shadowBlur =
+            glow;
+    }
+
+
+    ctx.beginPath();
+
+    ctx.roundRect(
+        -length / 2,
+        -width / 2,
+        length,
+        width,
+        3
+    );
+
+    ctx.fill();
+
+    ctx.restore();
+}
+
+
+// ==========================================
+// DROBNE DEKORACYJNE ZNACZNIKI
+// ==========================================
+
+function drawSmallTicks(
+    cx,
+    cy,
+    radius
+) {
 
     for (
         let i = 0;
         i < SEGMENTS;
         i++
     ) {
-        const rotatedIndex =
-            normalizeRotation(
-                i +
-                rotations[
-                    ringIndex
-                ]
+
+        if (i % 2 !== 0) {
+            continue;
+        }
+
+        drawSegment(
+            cx,
+            cy,
+            radius,
+            i,
+            "#242a33",
+            4,
+            7,
+            0
+        );
+    }
+}
+
+
+// ==========================================
+// RYSOWANIE JEDNEGO PIERŚCIENIA
+// ==========================================
+
+function drawRing(
+    cx,
+    cy,
+    ringIndex
+) {
+
+    const ring =
+        rings[ringIndex];
+
+    const radius =
+        RADII[ringIndex];
+
+    const active =
+        ringIndex ===
+        currentRing;
+
+
+    drawBaseRing(
+        cx,
+        cy,
+        radius,
+        active
+    );
+
+
+    drawSmallTicks(
+        cx,
+        cy,
+        radius
+    );
+
+
+    // -------------------------
+    // POMARAŃCZOWE CELE
+    // -------------------------
+
+    for (
+        const target
+        of ring.targets
+    ) {
+        drawSegment(
+            cx,
+            cy,
+            radius,
+            target,
+            "#d99a18",
+            10,
+            17,
+            3
+        );
+    }
+
+
+    // -------------------------
+    // RUCHOME ELEMENTY
+    // -------------------------
+
+    const blue =
+        isBluePosition(
+            ringIndex
+        );
+
+
+    for (
+        const offset
+        of ring.movingOffsets
+    ) {
+
+        const position =
+            normalize(
+                offset +
+                ring.rotation
             );
 
-        const start =
-            i * step -
-            Math.PI / 2;
-
-        const end =
-            start +
-            step * 0.72;
 
         let color =
-            "#2b2b34";
+            "#bf3f46";
 
-        const correct =
-            correctRotations[
-                ringIndex
-            ];
+        let glow = 3;
 
-        const fake =
-            alternativeRotations[
-                ringIndex
-            ];
 
         if (
-            rotatedIndex === correct
+            active &&
+            blue
         ) {
             color =
-                "#e48a24";
+                "#56dce8";
+
+            glow = 8;
         }
 
+
+        /*
+            zatwierdzone pierścienie
+            robimy lekko zielono/turkusowe
+        */
+
         if (
-            ringIndex === currentRing
+            ring.confirmedRotation !==
+                null &&
+            ringIndex <
+                currentRing
         ) {
-            if (
-                isBluePosition(
-                    ringIndex
-                ) &&
-                (
-                    rotatedIndex === correct ||
-                    (
-                        mode === "hard" &&
-                        rotatedIndex === fake
-                    )
-                )
-            ) {
-                color =
-                    "#27a7ff";
-            } else if (
-                rotatedIndex === correct ||
-                (
-                    mode === "hard" &&
-                    rotatedIndex === fake
-                )
-            ) {
-                color =
-                    "#d64747";
-            }
+            color =
+                "#49bfa8";
+
+            glow = 4;
         }
+
+
+        drawSegment(
+            cx,
+            cy,
+            radius,
+            position,
+            color,
+            9,
+            18,
+            glow
+        );
+    }
+
+
+    // aktywny pierścień dostaje
+    // subtelną poświatę
+    if (active) {
 
         ctx.beginPath();
 
@@ -439,71 +888,118 @@ function drawRing(
             cx,
             cy,
             radius,
-            start,
-            end
+            0,
+            Math.PI * 2
         );
 
         ctx.strokeStyle =
-            color;
+            "rgba(65, 198, 186, 0.20)";
 
-        ctx.lineWidth =
-            thickness;
-
-        ctx.lineCap =
-            "butt";
+        ctx.lineWidth = 5;
 
         ctx.stroke();
     }
 }
 
+
+// ==========================================
+// RYSOWANIE CAŁEJ PLANSZY
+// ==========================================
+
 function draw() {
-    canvas.width =
+
+    const width =
         canvas.clientWidth;
 
-    canvas.height =
+    const height =
         canvas.clientHeight;
+
 
     ctx.clearRect(
         0,
         0,
-        canvas.width,
-        canvas.height
+        width,
+        height
     );
 
+
+    ctx.fillStyle =
+        "#07070b";
+
+    ctx.fillRect(
+        0,
+        0,
+        width,
+        height
+    );
+
+
     const cx =
-        canvas.width / 2;
+        width * 0.47;
 
     const cy =
-        canvas.height / 2;
+        height * 0.50;
+
+
+    /*
+        WAŻNE:
+        currentRing = 0 oznacza
+        ZEWNĘTRZNY pierścień.
+
+        Czyli zaczynamy od góry /
+        od zewnątrz, a potem
+        schodzimy do środka.
+    */
 
     for (
-        let i = RINGS - 1;
-        i >= 0;
-        i--
+        let i = 0;
+        i < RINGS;
+        i++
     ) {
-        const radius =
-            80 + i * 43;
-
         drawRing(
             cx,
             cy,
-            radius,
-            20,
             i
         );
     }
 
+
+    // środkowe kółko
+    ctx.beginPath();
+
+    ctx.arc(
+        cx,
+        cy,
+        32,
+        0,
+        Math.PI * 2
+    );
+
     ctx.fillStyle =
-        "#ffffff";
+        "#101722";
+
+    ctx.fill();
+
+    ctx.strokeStyle =
+        "#26384b";
+
+    ctx.lineWidth = 2;
+
+    ctx.stroke();
+
+
+    ctx.fillStyle =
+        "#e2e6ec";
 
     ctx.font =
-        "bold 24px monospace";
+        "bold 16px monospace";
 
     ctx.textAlign =
         "center";
 
     ctx.textBaseline =
         "middle";
+
 
     ctx.fillText(
         (currentRing + 1) +
@@ -514,35 +1010,58 @@ function draw() {
     );
 }
 
+
+// ==========================================
+// TIMER / WYTRYCHY
+// ==========================================
+
 function updateTimer(now) {
+
     if (gameOver) {
         return;
     }
 
+
     const elapsed =
-        now - startTime;
+        now -
+        startTime;
+
 
     const remaining =
         Math.max(
             0,
-            gameTime - elapsed
+            gameTime -
+            elapsed
         );
 
-    const percent =
-        remaining /
-        gameTime *
+
+    const percentage =
+        (
+            remaining /
+            gameTime
+        ) *
         100;
 
-    timerBar.style.width =
-        percent + "%";
 
-    if (remaining <= 0) {
+    timerBar.style.width =
+        percentage +
+        "%";
+
+
+    if (
+        remaining <= 0
+    ) {
+
         lives--;
 
         livesText.textContent =
             lives;
 
-        if (lives <= 0) {
+
+        if (
+            lives <= 0
+        ) {
+
             gameOver = true;
 
             timerBar.style.width =
@@ -552,29 +1071,38 @@ function updateTimer(now) {
                 "FAILED";
 
             status.style.color =
-                "#ff4545";
+                "#e24d4d";
 
             return;
         }
+
 
         status.textContent =
             "Straciłeś wytrych";
 
         status.style.color =
-            "#ff9a33";
+            "#e48a24";
+
 
         startTime =
             performance.now();
 
+
         timerBar.style.width =
             "100%";
     }
+
 
     timerAnimation =
         requestAnimationFrame(
             updateTimer
         );
 }
+
+
+// ==========================================
+// BUTTONY
+// ==========================================
 
 easyButton.addEventListener(
     "click",
@@ -585,6 +1113,7 @@ easyButton.addEventListener(
     }
 );
 
+
 hardButton.addEventListener(
     "click",
     () => {
@@ -594,20 +1123,28 @@ hardButton.addEventListener(
     }
 );
 
+
 confirmButton.addEventListener(
     "click",
     confirmCurrent
 );
+
 
 backStepButton.addEventListener(
     "click",
     backStep
 );
 
+
 restartButton.addEventListener(
     "click",
     setupGame
 );
+
+
+// ==========================================
+// KLAWIATURA
+// ==========================================
 
 window.addEventListener(
     "keydown",
@@ -622,6 +1159,7 @@ window.addEventListener(
             rotateCurrent(-1);
         }
 
+
         if (
             event.key === "d" ||
             event.key === "D" ||
@@ -630,6 +1168,7 @@ window.addEventListener(
         ) {
             rotateCurrent(1);
         }
+
 
         if (
             event.code ===
@@ -640,6 +1179,7 @@ window.addEventListener(
             confirmCurrent();
         }
 
+
         if (
             event.key === "z" ||
             event.key === "Z"
@@ -649,9 +1189,11 @@ window.addEventListener(
     }
 );
 
+
 window.addEventListener(
     "resize",
-    draw
+    resizeCanvas
 );
+
 
 setupGame();
