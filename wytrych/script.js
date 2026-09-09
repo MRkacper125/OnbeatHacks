@@ -1,56 +1,37 @@
-const canvas =
-    document.getElementById("lockCanvas");
+const canvas = document.getElementById("lockCanvas");
+const ctx = canvas.getContext("2d");
 
-const ctx =
-    canvas.getContext("2d");
+const stageText = document.getElementById("stageText");
+const livesText = document.getElementById("livesText");
+const timerBar = document.getElementById("timerBar");
+const status = document.getElementById("status");
 
-const stageText =
-    document.getElementById("stageText");
+const easyButton = document.getElementById("easyButton");
+const hardButton = document.getElementById("hardButton");
 
-const livesText =
-    document.getElementById("livesText");
+const confirmButton = document.getElementById("confirmButton");
+const backStepButton = document.getElementById("backStepButton");
+const restartButton = document.getElementById("restartButton");
 
-const timerBar =
-    document.getElementById("timerBar");
-
-const status =
-    document.getElementById("status");
-
-const easyButton =
-    document.getElementById("easyButton");
-
-const hardButton =
-    document.getElementById("hardButton");
-
-const confirmButton =
-    document.getElementById("confirmButton");
-
-const backStepButton =
-    document.getElementById("backStepButton");
-
-const restartButton =
-    document.getElementById("restartButton");
-
-const timeInput =
-    document.getElementById("timeInput");
+const timeInput = document.getElementById("timeInput");
 
 
-// ==========================================
-// USTAWIENIA GRY
-// ==========================================
+// ==========================
+// USTAWIENIA
+// ==========================
 
 const RINGS = 5;
 
-// więcej pozycji na pierścieniu = gęstszy wygląd
-const SEGMENTS = 32;
+// dużo więcej możliwych pozycji
+const SLOTS = 48;
 
-// promienie od ZEWNĘTRZNEGO do WEWNĘTRZNEGO
+// od zewnętrznego do wewnętrznego
 const RADII = [
     245,
     198,
     151,
     104,
-    62
+    65
 ];
 
 let mode = "easy";
@@ -67,57 +48,38 @@ let startTime = 0;
 
 let timerAnimation = null;
 
-
-// każdy pierścień ma własne dane
 let rings = [];
 
 
-// ==========================================
+// ==========================
 // POMOCNICZE
-// ==========================================
+// ==========================
 
 function randomInt(max) {
-    return Math.floor(
-        Math.random() * max
-    );
+    return Math.floor(Math.random() * max);
 }
-
-
-function clamp(value, min, max) {
-    return Math.max(
-        min,
-        Math.min(max, value)
-    );
-}
-
 
 function normalize(value) {
-    let result =
-        value % SEGMENTS;
+    let result = value % SLOTS;
 
     if (result < 0) {
-        result += SEGMENTS;
+        result += SLOTS;
     }
 
     return result;
 }
 
+function clamp(value, min, max) {
+    return Math.max(min, Math.min(max, value));
+}
 
 function shuffle(array) {
     const copy = [...array];
 
-    for (
-        let i = copy.length - 1;
-        i > 0;
-        i--
-    ) {
-        const j =
-            randomInt(i + 1);
+    for (let i = copy.length - 1; i > 0; i--) {
+        const j = randomInt(i + 1);
 
-        [
-            copy[i],
-            copy[j]
-        ] = [
+        [copy[i], copy[j]] = [
             copy[j],
             copy[i]
         ];
@@ -127,157 +89,165 @@ function shuffle(array) {
 }
 
 
-// ==========================================
+// ==========================
 // CZAS
-// ==========================================
+// ==========================
 
 function getSelectedTime() {
-    let seconds =
-        Number(timeInput.value);
+    let seconds = Number(timeInput.value);
 
     if (!Number.isFinite(seconds)) {
         seconds = 15;
     }
 
-    seconds =
-        clamp(
-            seconds,
-            5,
-            120
-        );
+    seconds = clamp(seconds, 5, 120);
 
-    timeInput.value =
-        seconds;
+    timeInput.value = seconds;
 
     return seconds * 1000;
 }
 
 
-// ==========================================
+// ==========================
 // GENEROWANIE PIERŚCIENIA
-// ==========================================
+// ==========================
 
 function createRing(index) {
 
-    // im dalszy pierścień, tym może być
-    // trochę więcej elementów
+    /*
+        Każdy ring ma dużo celów.
+
+        Zewnętrzny: 8-11
+        następny: 7-10
+        itd.
+    */
+
     const minTargets =
-        index === 0 ? 4 : 3;
+        Math.max(5, 8 - index);
 
     const maxTargets =
-        index === 0 ? 6 : 5;
+        Math.max(7, 11 - index);
+
 
     const targetCount =
         minTargets +
         randomInt(
-            maxTargets -
-            minTargets +
-            1
+            maxTargets - minTargets + 1
         );
 
 
-    // tworzymy kilka pozycji celu
-    const available = [];
+    const positions = [];
 
-    for (
-        let i = 0;
-        i < SEGMENTS;
-        i++
-    ) {
-        available.push(i);
+    for (let i = 0; i < SLOTS; i++) {
+        positions.push(i);
     }
-
-    const shuffled =
-        shuffle(available);
-
-    const targets =
-        shuffled
-            .slice(0, targetCount)
-            .sort(
-                (a, b) => a - b
-            );
 
 
     /*
-        movingOffsets to układ czerwonych
-        elementów.
-
-        Przesuwają się wszystkie razem.
-
-        Przy correctRotation wszystkie
-        pokrywają się z targets.
+        Nie chcemy żeby wszystkie
+        elementy były obok siebie.
     */
 
+    let targets = [];
+
+    const shuffled = shuffle(positions);
+
+    for (const candidate of shuffled) {
+
+        const tooClose = targets.some(target => {
+
+            const distance =
+                Math.min(
+                    Math.abs(candidate - target),
+                    SLOTS - Math.abs(candidate - target)
+                );
+
+            return distance < 3;
+        });
+
+        if (!tooClose) {
+            targets.push(candidate);
+        }
+
+        if (targets.length >= targetCount) {
+            break;
+        }
+    }
+
+
+    targets.sort((a, b) => a - b);
+
+
     const correctRotation =
-        randomInt(SEGMENTS);
+        randomInt(SLOTS);
+
+
+    /*
+        Czerwone elementy mają dokładnie
+        taki sam układ jak pomarańczowe,
+        ale są przesunięte.
+    */
 
     const movingOffsets =
-        targets.map(
-            target =>
-                normalize(
-                    target -
-                    correctRotation
-                )
+        targets.map(target =>
+            normalize(
+                target - correctRotation
+            )
         );
 
 
-    // pozycja początkowa nie powinna
-    // od razu być poprawna
     let rotation =
-        randomInt(SEGMENTS);
+        randomInt(SLOTS);
 
     while (
         rotation === correctRotation
     ) {
         rotation =
-            randomInt(SEGMENTS);
+            randomInt(SLOTS);
     }
 
 
-    // HARD dostaje drugie "niebieskie"
-    // ustawienie, które może być fałszywe
+    /*
+        HARD:
+        drugi niebieski układ,
+        który wygląda dobrze,
+        ale może być fałszywy.
+    */
+
     let fakeRotation = null;
 
     if (mode === "hard") {
 
         fakeRotation =
-            randomInt(SEGMENTS);
+            randomInt(SLOTS);
 
         while (
-            fakeRotation ===
-                correctRotation ||
+            fakeRotation === correctRotation ||
             fakeRotation === rotation
         ) {
             fakeRotation =
-                randomInt(SEGMENTS);
+                randomInt(SLOTS);
         }
     }
 
 
     return {
-        targets: targets,
+        targets,
+        movingOffsets,
 
-        movingOffsets:
-            movingOffsets,
+        correctRotation,
+        fakeRotation,
 
-        correctRotation:
-            correctRotation,
+        rotation,
 
-        fakeRotation:
-            fakeRotation,
-
-        rotation:
-            rotation,
-
-        confirmedRotation:
-            null
+        confirmedRotation: null
     };
 }
 
 
-// ==========================================
-// START / RESTART
-// ==========================================
+// ==========================
+// START
+// ==========================
 
 function setupGame() {
 
@@ -298,15 +268,13 @@ function setupGame() {
 
     rings = [];
 
-    for (
-        let i = 0;
-        i < RINGS;
-        i++
-    ) {
+
+    for (let i = 0; i < RINGS; i++) {
         rings.push(
             createRing(i)
         );
     }
+
 
     startTime =
         performance.now();
@@ -320,8 +288,6 @@ function setupGame() {
 
     resizeCanvas();
 
-    draw();
-
     timerAnimation =
         requestAnimationFrame(
             updateTimer
@@ -329,19 +295,18 @@ function setupGame() {
 }
 
 
-// ==========================================
+// ==========================
 // UI
-// ==========================================
+// ==========================
 
 function updateUI() {
 
     stageText.textContent =
-        (currentRing + 1) +
-        "/" +
-        RINGS;
+        `${currentRing + 1}/${RINGS}`;
 
     livesText.textContent =
         lives;
+
 
     easyButton.classList.toggle(
         "active",
@@ -355,59 +320,66 @@ function updateUI() {
 }
 
 
-// ==========================================
-// SPRAWDZANIE POZYCJI
-// ==========================================
+// ==========================
+// SPRAWDZANIE
+// ==========================
 
-function isBluePosition(
-    ringIndex
-) {
+function isBluePosition(index) {
+
     const ring =
-        rings[ringIndex];
+        rings[index];
 
-    const current =
-        normalize(
-            ring.rotation
-        );
+    const position =
+        normalize(ring.rotation);
+
 
     if (
-        current ===
+        position ===
         ring.correctRotation
     ) {
         return true;
     }
 
+
     if (
         mode === "hard" &&
-        current ===
+        position ===
         ring.fakeRotation
     ) {
         return true;
     }
 
+
     return false;
 }
 
 
-function isActuallyCorrect(
-    ringIndex,
-    rotation
-) {
+function isActuallyCorrect(index) {
+
+    const ring =
+        rings[index];
+
+    if (
+        ring.confirmedRotation === null
+    ) {
+        return false;
+    }
+
     return (
-        normalize(rotation) ===
-        rings[ringIndex]
-            .correctRotation
+        normalize(
+            ring.confirmedRotation
+        ) ===
+        ring.correctRotation
     );
 }
 
 
-// ==========================================
-// OBRACANIE
-// ==========================================
+// ==========================
+// OBRÓT
+// ==========================
 
-function rotateCurrent(
-    direction
-) {
+function rotateCurrent(direction) {
+
     if (gameOver) {
         return;
     }
@@ -427,9 +399,9 @@ function rotateCurrent(
 }
 
 
-// ==========================================
+// ==========================
 // ZATWIERDZANIE
-// ==========================================
+// ==========================
 
 function confirmCurrent() {
 
@@ -437,36 +409,34 @@ function confirmCurrent() {
         return;
     }
 
-    const ring =
-        rings[currentRing];
 
     if (
-        !isBluePosition(
-            currentRing
-        )
+        !isBluePosition(currentRing)
     ) {
         status.textContent =
-            "Najpierw dopasuj układ na niebiesko.";
+            "Najpierw ustaw elementy na niebiesko.";
 
         status.style.color =
-            "#e24d4d";
+            "#ef4b4b";
 
         return;
     }
 
 
-    ring.confirmedRotation =
-        ring.rotation;
-
-
-    status.textContent = "";
+    rings[currentRing]
+        .confirmedRotation =
+        rings[currentRing]
+            .rotation;
 
 
     if (
         currentRing <
         RINGS - 1
     ) {
+
         currentRing++;
+
+        status.textContent = "";
 
         updateUI();
 
@@ -476,27 +446,24 @@ function confirmCurrent() {
     }
 
 
-    checkFinalSolution();
+    checkSolution();
 }
 
 
-// ==========================================
-// HARD / SPRAWDZENIE KOŃCOWE
-// ==========================================
+// ==========================
+// FINAŁ
+// ==========================
 
-function checkFinalSolution() {
+function checkSolution() {
 
-    const allCorrect =
+    const correct =
         rings.every(
-            (ring, index) =>
-                isActuallyCorrect(
-                    index,
-                    ring.confirmedRotation
-                )
+            (_, index) =>
+                isActuallyCorrect(index)
         );
 
 
-    if (allCorrect) {
+    if (correct) {
 
         gameOver = true;
 
@@ -504,7 +471,7 @@ function checkFinalSolution() {
             "SUCCESS";
 
         status.style.color =
-            "#28d980";
+            "#3ee58c";
 
         return;
     }
@@ -513,26 +480,26 @@ function checkFinalSolution() {
     if (mode === "hard") {
 
         status.textContent =
-            "Układ nie pasuje — cofnij się i wybierz inne niebieskie ustawienie.";
+            "Układ nie pasuje. Cofnij się i wybierz inne niebieskie ustawienie.";
 
         status.style.color =
-            "#f0a13a";
+            "#ff9d2e";
 
         return;
     }
 
 
     status.textContent =
-        "Błędny układ";
+        "BŁĘDNY UKŁAD";
 
     status.style.color =
-        "#e24d4d";
+        "#ef4b4b";
 }
 
 
-// ==========================================
+// ==========================
 // COFANIE
-// ==========================================
+// ==========================
 
 function backStep() {
 
@@ -558,7 +525,7 @@ function backStep() {
 
 
     status.textContent =
-        "Cofnięto o jeden pierścień.";
+        "Cofnięto.";
 
     status.style.color =
         "#e48a24";
@@ -570,9 +537,9 @@ function backStep() {
 }
 
 
-// ==========================================
+// ==========================
 // CANVAS
-// ==========================================
+// ==========================
 
 function resizeCanvas() {
 
@@ -581,6 +548,7 @@ function resizeCanvas() {
 
     const dpr =
         window.devicePixelRatio || 1;
+
 
     canvas.width =
         Math.round(
@@ -592,6 +560,7 @@ function resizeCanvas() {
             rect.height * dpr
         );
 
+
     ctx.setTransform(
         dpr,
         0,
@@ -601,15 +570,16 @@ function resizeCanvas() {
         0
     );
 
+
     draw();
 }
 
 
-// ==========================================
-// RYSOWANIE CIENKIEGO PIERŚCIENIA
-// ==========================================
+// ==========================
+// TORY
+// ==========================
 
-function drawBaseRing(
+function drawTrack(
     cx,
     cy,
     radius,
@@ -626,37 +596,89 @@ function drawBaseRing(
         Math.PI * 2
     );
 
+
     ctx.strokeStyle =
         active
-            ? "#35404a"
-            : "#242933";
+            ? "#34404b"
+            : "#202630";
+
 
     ctx.lineWidth =
         active ? 3 : 2;
 
+
     ctx.stroke();
+
+
+    /*
+        dużo małych znaczników
+        dookoła każdego pierścienia
+    */
+
+    for (let i = 0; i < SLOTS; i++) {
+
+        const angle =
+            (
+                i /
+                SLOTS
+            ) *
+            Math.PI *
+            2
+            -
+            Math.PI / 2;
+
+
+        const x =
+            cx +
+            Math.cos(angle) *
+            radius;
+
+        const y =
+            cy +
+            Math.sin(angle) *
+            radius;
+
+
+        ctx.beginPath();
+
+        ctx.arc(
+            x,
+            y,
+            active ? 2 : 1.5,
+            0,
+            Math.PI * 2
+        );
+
+
+        ctx.fillStyle =
+            active
+                ? "#394652"
+                : "#272d36";
+
+
+        ctx.fill();
+    }
 }
 
 
-// ==========================================
-// MAŁY SEGMENT NA PIERŚCIENIU
-// ==========================================
+// ==========================
+// KOLOROWY ELEMENT
+// ==========================
 
-function drawSegment(
+function drawMarker(
     cx,
     cy,
     radius,
-    position,
+    slot,
     color,
-    width = 10,
-    length = 18,
+    size = 11,
     glow = 0
 ) {
 
     const angle =
         (
-            position /
-            SEGMENTS
+            slot /
+            SLOTS
         ) *
         Math.PI *
         2
@@ -677,10 +699,12 @@ function drawSegment(
 
     ctx.save();
 
+
     ctx.translate(
         x,
         y
     );
+
 
     ctx.rotate(
         angle +
@@ -692,87 +716,54 @@ function drawSegment(
         color;
 
 
-    if (glow > 0) {
-        ctx.shadowColor =
-            color;
+    ctx.shadowColor =
+        color;
 
-        ctx.shadowBlur =
-            glow;
-    }
+    ctx.shadowBlur =
+        glow;
 
 
     ctx.beginPath();
 
+
     ctx.roundRect(
-        -length / 2,
-        -width / 2,
-        length,
-        width,
+        -8,
+        -size / 2,
+        16,
+        size,
         3
     );
 
+
     ctx.fill();
+
 
     ctx.restore();
 }
 
 
-// ==========================================
-// DROBNE DEKORACYJNE ZNACZNIKI
-// ==========================================
-
-function drawSmallTicks(
-    cx,
-    cy,
-    radius
-) {
-
-    for (
-        let i = 0;
-        i < SEGMENTS;
-        i++
-    ) {
-
-        if (i % 2 !== 0) {
-            continue;
-        }
-
-        drawSegment(
-            cx,
-            cy,
-            radius,
-            i,
-            "#242a33",
-            4,
-            7,
-            0
-        );
-    }
-}
-
-
-// ==========================================
-// RYSOWANIE JEDNEGO PIERŚCIENIA
-// ==========================================
+// ==========================
+// JEDEN RING
+// ==========================
 
 function drawRing(
     cx,
     cy,
-    ringIndex
+    index
 ) {
 
     const ring =
-        rings[ringIndex];
+        rings[index];
 
     const radius =
-        RADII[ringIndex];
+        RADII[index];
 
     const active =
-        ringIndex ===
+        index ===
         currentRing;
 
 
-    drawBaseRing(
+    drawTrack(
         cx,
         cy,
         radius,
@@ -780,42 +771,33 @@ function drawRing(
     );
 
 
-    drawSmallTicks(
-        cx,
-        cy,
-        radius
-    );
-
-
-    // -------------------------
+    // ======================
     // POMARAŃCZOWE CELE
-    // -------------------------
+    // ======================
 
     for (
         const target
         of ring.targets
     ) {
-        drawSegment(
+
+        drawMarker(
             cx,
             cy,
             radius,
             target,
-            "#d99a18",
+            "#c98b12",
             10,
-            17,
-            3
+            4
         );
     }
 
 
-    // -------------------------
+    // ======================
     // RUCHOME ELEMENTY
-    // -------------------------
+    // ======================
 
     const blue =
-        isBluePosition(
-            ringIndex
-        );
+        isBluePosition(index);
 
 
     for (
@@ -831,80 +813,60 @@ function drawRing(
 
 
         let color =
-            "#bf3f46";
+            "#d3444c";
 
-        let glow = 3;
+        let glow = 4;
 
+
+        /*
+            Aktywny ring:
+            trafiony = niebieski
+        */
 
         if (
             active &&
             blue
         ) {
             color =
-                "#56dce8";
+                "#50d8ef";
 
-            glow = 8;
+            glow = 10;
         }
 
 
         /*
-            zatwierdzone pierścienie
-            robimy lekko zielono/turkusowe
+            już zatwierdzone
         */
 
         if (
+            index <
+                currentRing &&
             ring.confirmedRotation !==
-                null &&
-            ringIndex <
-                currentRing
+                null
         ) {
             color =
-                "#49bfa8";
+                "#45bd9f";
 
-            glow = 4;
+            glow = 5;
         }
 
 
-        drawSegment(
+        drawMarker(
             cx,
             cy,
             radius,
             position,
             color,
-            9,
-            18,
+            8,
             glow
         );
-    }
-
-
-    // aktywny pierścień dostaje
-    // subtelną poświatę
-    if (active) {
-
-        ctx.beginPath();
-
-        ctx.arc(
-            cx,
-            cy,
-            radius,
-            0,
-            Math.PI * 2
-        );
-
-        ctx.strokeStyle =
-            "rgba(65, 198, 186, 0.20)";
-
-        ctx.lineWidth = 5;
-
-        ctx.stroke();
     }
 }
 
 
-// ==========================================
-// RYSOWANIE CAŁEJ PLANSZY
-// ==========================================
+// ==========================
+// CAŁA PLANSZA
+// ==========================
 
 function draw() {
 
@@ -926,6 +888,7 @@ function draw() {
     ctx.fillStyle =
         "#07070b";
 
+
     ctx.fillRect(
         0,
         0,
@@ -935,20 +898,16 @@ function draw() {
 
 
     const cx =
-        width * 0.47;
+        width * 0.49;
 
     const cy =
-        height * 0.50;
+        height * 0.5;
 
 
     /*
-        WAŻNE:
-        currentRing = 0 oznacza
-        ZEWNĘTRZNY pierścień.
+        0 = ZEWNĘTRZNY
 
-        Czyli zaczynamy od góry /
-        od zewnątrz, a potem
-        schodzimy do środka.
+        potem idziemy do środka
     */
 
     for (
@@ -956,6 +915,7 @@ function draw() {
         i < RINGS;
         i++
     ) {
+
         drawRing(
             cx,
             cy,
@@ -964,24 +924,26 @@ function draw() {
     }
 
 
-    // środkowe kółko
+    // środek
     ctx.beginPath();
 
     ctx.arc(
         cx,
         cy,
-        32,
+        31,
         0,
         Math.PI * 2
     );
 
+
     ctx.fillStyle =
-        "#101722";
+        "#101721";
 
     ctx.fill();
 
+
     ctx.strokeStyle =
-        "#26384b";
+        "#26394a";
 
     ctx.lineWidth = 2;
 
@@ -989,10 +951,12 @@ function draw() {
 
 
     ctx.fillStyle =
-        "#e2e6ec";
+        "#ffffff";
+
 
     ctx.font =
         "bold 16px monospace";
+
 
     ctx.textAlign =
         "center";
@@ -1002,18 +966,16 @@ function draw() {
 
 
     ctx.fillText(
-        (currentRing + 1) +
-        "/" +
-        RINGS,
+        `${currentRing + 1}/${RINGS}`,
         cx,
         cy
     );
 }
 
 
-// ==========================================
-// TIMER / WYTRYCHY
-// ==========================================
+// ==========================
+// TIMER
+// ==========================
 
 function updateTimer(now) {
 
@@ -1035,17 +997,14 @@ function updateTimer(now) {
         );
 
 
-    const percentage =
-        (
-            remaining /
-            gameTime
-        ) *
+    const percent =
+        remaining /
+        gameTime *
         100;
 
 
     timerBar.style.width =
-        percentage +
-        "%";
+        `${percent}%`;
 
 
     if (
@@ -1067,11 +1026,13 @@ function updateTimer(now) {
             timerBar.style.width =
                 "0%";
 
+
             status.textContent =
                 "FAILED";
 
+
             status.style.color =
-                "#e24d4d";
+                "#ef4b4b";
 
             return;
         }
@@ -1079,6 +1040,7 @@ function updateTimer(now) {
 
         status.textContent =
             "Straciłeś wytrych";
+
 
         status.style.color =
             "#e48a24";
@@ -1100,13 +1062,14 @@ function updateTimer(now) {
 }
 
 
-// ==========================================
+// ==========================
 // BUTTONY
-// ==========================================
+// ==========================
 
 easyButton.addEventListener(
     "click",
     () => {
+
         mode = "easy";
 
         setupGame();
@@ -1117,6 +1080,7 @@ easyButton.addEventListener(
 hardButton.addEventListener(
     "click",
     () => {
+
         mode = "hard";
 
         setupGame();
@@ -1142,9 +1106,9 @@ restartButton.addEventListener(
 );
 
 
-// ==========================================
+// ==========================
 // KLAWIATURA
-// ==========================================
+// ==========================
 
 window.addEventListener(
     "keydown",
@@ -1153,9 +1117,9 @@ window.addEventListener(
         if (
             event.key === "a" ||
             event.key === "A" ||
-            event.key ===
-                "ArrowLeft"
+            event.key === "ArrowLeft"
         ) {
+
             rotateCurrent(-1);
         }
 
@@ -1163,17 +1127,17 @@ window.addEventListener(
         if (
             event.key === "d" ||
             event.key === "D" ||
-            event.key ===
-                "ArrowRight"
+            event.key === "ArrowRight"
         ) {
+
             rotateCurrent(1);
         }
 
 
         if (
-            event.code ===
-            "Space"
+            event.code === "Space"
         ) {
+
             event.preventDefault();
 
             confirmCurrent();
@@ -1184,6 +1148,7 @@ window.addEventListener(
             event.key === "z" ||
             event.key === "Z"
         ) {
+
             backStep();
         }
     }
