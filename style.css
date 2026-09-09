@@ -54,9 +54,8 @@ h1 {
         0 0 6px rgba(0, 168, 68, 0.4);
 }
 
-button {
+.hack-button {
     position: fixed;
-
     top: 120px;
     left: 10px;
 
@@ -67,7 +66,6 @@ button {
     padding: 14px 20px;
 
     background: #020a05;
-
     color: #00b84f;
 
     border: 1px solid #00a844;
@@ -78,14 +76,23 @@ button {
     font-weight: bold;
 
     letter-spacing: 1px;
-
-    cursor: pointer;
+    text-align: center;
+    text-decoration: none;
 
     box-shadow:
         0 0 5px rgba(0, 184, 79, 0.4),
         inset 0 0 5px rgba(0, 184, 79, 0.1);
 
     transition: 0.2s;
+}
+
+.hack-button:hover {
+    background: #003016;
+
+    box-shadow:
+        0 0 10px rgba(0, 184, 79, 0.7);
+
+    transform: translateX(3px);
 }
 
 button:hover {
