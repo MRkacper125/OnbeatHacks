@@ -15,7 +15,13 @@ const restartButton = document.getElementById("restartButton");
 
 const timeInput = document.getElementById("timeInput");
 
+
+// ======================================================
+// USTAWIENIA
+// ======================================================
+
 const RINGS = 5;
+const STAGES = 5;
 const SLOTS = 40;
 
 const RADII = [
@@ -27,29 +33,51 @@ const RADII = [
 ];
 
 const COLORS = {
-    target: "#d89316",
-    wrong: "#d84a4a",
-    correct: "#4fd8e8",
-    confirmed: "#4cc7a1",
+    target: "#d89316",       // pomarańczowy = cel
+    wrong: "#d84a4a",        // czerwony = źle
+    correct: "#4fd8e8",      // niebieski = można zatwierdzić
+    confirmed: "#4cc7a1",    // zielony = zaliczone
     track: "#27303a",
     inactive: "#1c232c"
 };
 
+
+// ======================================================
+// STAN GRY
+// ======================================================
+
 let mode = "easy";
 
-let currentRing = 0;
+let currentStage = 0;
+
 let lives = 3;
+
 let gameOver = false;
 
 let gameTime = 15000;
 let startTime = 0;
+
 let timerAnimation = null;
 
-let rings = [];
+
+// wszystkie pomarańczowe cele
+let targets = new Set();
+
+// pola już wykorzystane
+let claimed = new Set();
+
+// dane 5 układów
+let stages = [];
+
+
+// ======================================================
+// POMOCNICZE
+// ======================================================
 
 function randomInt(max) {
     return Math.floor(Math.random() * max);
 }
+
 
 function normalize(value) {
     let result = value % SLOTS;
@@ -61,9 +89,19 @@ function normalize(value) {
     return result;
 }
 
+
 function clamp(value, min, max) {
-    return Math.max(min, Math.min(max, value));
+    return Math.max(
+        min,
+        Math.min(max, value)
+    );
 }
+
+
+function cellKey(ring, slot) {
+    return ring + ":" + normalize(slot);
+}
+
 
 function shuffle(array) {
     const copy = [...array];
@@ -80,6 +118,7 @@ function shuffle(array) {
     return copy;
 }
 
+
 function getSelectedTime() {
     let seconds = Number(timeInput.value);
 
@@ -87,120 +126,452 @@ function getSelectedTime() {
         seconds = 15;
     }
 
-    seconds = clamp(seconds, 5, 120);
+    seconds = clamp(
+        seconds,
+        5,
+        120
+    );
 
     timeInput.value = seconds;
 
     return seconds * 1000;
 }
 
-function createRing(index) {
+
+// ======================================================
+// TWORZENIE WZORU WYTRYCHA
+// ======================================================
+
+function createPattern(count) {
+    const pattern = [];
+
+    const used = new Set();
+
+    while (pattern.length < count) {
+        const ring = randomInt(RINGS);
+        const offset = randomInt(SLOTS);
+
+        const key =
+            cellKey(ring, offset);
+
+        if (used.has(key)) {
+            continue;
+        }
+
+        used.add(key);
+
+        pattern.push({
+            ring: ring,
+            offset: offset
+        });
+    }
+
     /*
-        Mniej elementów niż wcześniej.
-        Zewnętrzne pierścienie mają trochę więcej.
+        Chcemy, żeby układ był na kilku
+        różnych pierścieniach.
     */
 
-    const targetCount =
-        index === 0 ? 6 :
-        index === 1 ? 6 :
-        index === 2 ? 5 :
-        index === 3 ? 4 :
-        3;
-
-    const possible = [];
-
-    for (let i = 0; i < SLOTS; i++) {
-        possible.push(i);
-    }
-
-    const shuffled = shuffle(possible);
-
-    const targets = [];
-
-    for (const candidate of shuffled) {
-        const tooClose = targets.some(target => {
-            const difference =
-                Math.abs(candidate - target);
-
-            const distance =
-                Math.min(
-                    difference,
-                    SLOTS - difference
-                );
-
-            return distance < 4;
-        });
-
-        if (!tooClose) {
-            targets.push(candidate);
-        }
-
-        if (targets.length >= targetCount) {
-            break;
-        }
-    }
-
-    targets.sort((a, b) => a - b);
-
-    const correctRotation =
-        randomInt(SLOTS);
-
-    const movingOffsets =
-        targets.map(target =>
-            normalize(
-                target - correctRotation
+    const ringsUsed =
+        new Set(
+            pattern.map(
+                marker => marker.ring
             )
         );
 
-    let rotation =
-        randomInt(SLOTS);
-
-    while (rotation === correctRotation) {
-        rotation =
-            randomInt(SLOTS);
+    if (ringsUsed.size < 2) {
+        return createPattern(count);
     }
 
-    let fakeRotation = null;
-
-    if (mode === "hard") {
-        fakeRotation =
-            normalize(
-                correctRotation +
-                Math.floor(SLOTS / 2)
-            );
-    }
-
-    return {
-        targets,
-        movingOffsets,
-
-        correctRotation,
-        fakeRotation,
-
-        rotation,
-
-        confirmedRotation: null
-    };
+    return pattern;
 }
+
+
+// ======================================================
+// PRZESUNIĘCIE CAŁEGO UKŁADU
+// ======================================================
+
+function getPatternCells(
+    pattern,
+    rotation
+) {
+    return pattern.map(marker => ({
+        ring: marker.ring,
+
+        slot: normalize(
+            marker.offset + rotation
+        )
+    }));
+}
+
+
+function cellsAreFree(cells, occupied) {
+    return cells.every(cell =>
+        !occupied.has(
+            cellKey(
+                cell.ring,
+                cell.slot
+            )
+        )
+    );
+}
+
+
+// ======================================================
+// ZNAJDOWANIE ROTACJI NIEKOLIDUJĄCEJ
+// ======================================================
+
+function findFreeRotation(
+    pattern,
+    occupied,
+    forbidden = []
+) {
+    const rotations =
+        shuffle(
+            Array.from(
+                { length: SLOTS },
+                (_, i) => i
+            )
+        );
+
+    for (const rotation of rotations) {
+        if (
+            forbidden.includes(rotation)
+        ) {
+            continue;
+        }
+
+        const cells =
+            getPatternCells(
+                pattern,
+                rotation
+            );
+
+        if (
+            cellsAreFree(
+                cells,
+                occupied
+            )
+        ) {
+            return rotation;
+        }
+    }
+
+    return null;
+}
+
+
+// ======================================================
+// GENEROWANIE CAŁEJ ŁAMIGŁÓWKI
+// ======================================================
+
+function generatePuzzle() {
+    targets = new Set();
+    claimed = new Set();
+    stages = [];
+
+    const occupied = new Set();
+
+    /*
+        ETAP 1
+    */
+
+    const firstPattern =
+        createPattern(4);
+
+    const firstRotation =
+        findFreeRotation(
+            firstPattern,
+            occupied
+        );
+
+    const firstCells =
+        getPatternCells(
+            firstPattern,
+            firstRotation
+        );
+
+    for (const cell of firstCells) {
+        occupied.add(
+            cellKey(
+                cell.ring,
+                cell.slot
+            )
+        );
+    }
+
+    stages.push({
+        pattern: firstPattern,
+
+        solutionRotation:
+            firstRotation,
+
+        allowedRotations: [
+            firstRotation
+        ],
+
+        rotation:
+            randomInt(SLOTS),
+
+        confirmedRotation: null,
+
+        confirmedCells: []
+    });
+
+
+    /*
+        ETAP 2 + ETAP 3
+
+        W HARD tutaj robimy pułapkę.
+
+        Oba używają TEGO SAMEGO kształtu,
+        ale w dwóch różnych pozycjach.
+
+        Etap 2 może wybrać:
+        - swoją prawidłową pozycję
+        - albo pozycję potrzebną etapowi 3
+
+        Jeśli zabierzesz pola etapu 3,
+        etap 3 nie będzie już pasował.
+    */
+
+    const sharedPattern =
+        createPattern(4);
+
+    const secondRotation =
+        findFreeRotation(
+            sharedPattern,
+            occupied
+        );
+
+    const secondCells =
+        getPatternCells(
+            sharedPattern,
+            secondRotation
+        );
+
+    for (const cell of secondCells) {
+        occupied.add(
+            cellKey(
+                cell.ring,
+                cell.slot
+            )
+        );
+    }
+
+
+    const thirdRotation =
+        findFreeRotation(
+            sharedPattern,
+            occupied,
+            [secondRotation]
+        );
+
+    const thirdCells =
+        getPatternCells(
+            sharedPattern,
+            thirdRotation
+        );
+
+    for (const cell of thirdCells) {
+        occupied.add(
+            cellKey(
+                cell.ring,
+                cell.slot
+            )
+        );
+    }
+
+
+    stages.push({
+        pattern: sharedPattern,
+
+        solutionRotation:
+            secondRotation,
+
+        allowedRotations:
+            mode === "hard"
+                ? [
+                    secondRotation,
+                    thirdRotation
+                ]
+                : [
+                    secondRotation
+                ],
+
+        rotation:
+            randomInt(SLOTS),
+
+        confirmedRotation: null,
+
+        confirmedCells: []
+    });
+
+
+    stages.push({
+        pattern: sharedPattern,
+
+        solutionRotation:
+            thirdRotation,
+
+        allowedRotations: [
+            thirdRotation
+        ],
+
+        rotation:
+            randomInt(SLOTS),
+
+        confirmedRotation: null,
+
+        confirmedCells: []
+    });
+
+
+    /*
+        ETAP 4
+    */
+
+    const fourthPattern =
+        createPattern(4);
+
+    const fourthRotation =
+        findFreeRotation(
+            fourthPattern,
+            occupied
+        );
+
+    const fourthCells =
+        getPatternCells(
+            fourthPattern,
+            fourthRotation
+        );
+
+    for (const cell of fourthCells) {
+        occupied.add(
+            cellKey(
+                cell.ring,
+                cell.slot
+            )
+        );
+    }
+
+    stages.push({
+        pattern: fourthPattern,
+
+        solutionRotation:
+            fourthRotation,
+
+        allowedRotations: [
+            fourthRotation
+        ],
+
+        rotation:
+            randomInt(SLOTS),
+
+        confirmedRotation: null,
+
+        confirmedCells: []
+    });
+
+
+    /*
+        ETAP 5
+    */
+
+    const fifthPattern =
+        createPattern(3);
+
+    const fifthRotation =
+        findFreeRotation(
+            fifthPattern,
+            occupied
+        );
+
+    const fifthCells =
+        getPatternCells(
+            fifthPattern,
+            fifthRotation
+        );
+
+    for (const cell of fifthCells) {
+        occupied.add(
+            cellKey(
+                cell.ring,
+                cell.slot
+            )
+        );
+    }
+
+    stages.push({
+        pattern: fifthPattern,
+
+        solutionRotation:
+            fifthRotation,
+
+        allowedRotations: [
+            fifthRotation
+        ],
+
+        rotation:
+            randomInt(SLOTS),
+
+        confirmedRotation: null,
+
+        confirmedCells: []
+    });
+
+
+    /*
+        Wszystkie pola rozwiązania
+        stają się pomarańczowymi celami.
+    */
+
+    for (
+        let i = 0;
+        i < stages.length;
+        i++
+    ) {
+        const stage =
+            stages[i];
+
+        const cells =
+            getPatternCells(
+                stage.pattern,
+                stage.solutionRotation
+            );
+
+        for (const cell of cells) {
+            targets.add(
+                cellKey(
+                    cell.ring,
+                    cell.slot
+                )
+            );
+        }
+    }
+}
+
+
+// ======================================================
+// START GRY
+// ======================================================
 
 function setupGame() {
     if (timerAnimation) {
-        cancelAnimationFrame(timerAnimation);
-    }
-
-    gameTime = getSelectedTime();
-
-    currentRing = 0;
-    lives = 3;
-    gameOver = false;
-
-    rings = [];
-
-    for (let i = 0; i < RINGS; i++) {
-        rings.push(
-            createRing(i)
+        cancelAnimationFrame(
+            timerAnimation
         );
     }
+
+    gameTime =
+        getSelectedTime();
+
+    currentStage = 0;
+
+    lives = 3;
+
+    gameOver = false;
+
+    generatePuzzle();
 
     startTime =
         performance.now();
@@ -211,6 +582,7 @@ function setupGame() {
     status.textContent = "";
 
     updateUI();
+
     resizeCanvas();
 
     timerAnimation =
@@ -219,9 +591,14 @@ function setupGame() {
         );
 }
 
+
+// ======================================================
+// UI
+// ======================================================
+
 function updateUI() {
     stageText.textContent =
-        `${currentRing + 1}/${RINGS}`;
+        `${currentStage + 1}/${STAGES}`;
 
     livesText.textContent =
         lives;
@@ -237,53 +614,99 @@ function updateUI() {
     );
 }
 
-function isBluePosition(index) {
-    const ring = rings[index];
 
-    const current =
-        normalize(ring.rotation);
+// ======================================================
+// AKTUALNE POLA WYTRYCHA
+// ======================================================
 
-    if (
-        current ===
-        ring.correctRotation
-    ) {
-        return true;
-    }
+function getCurrentCells() {
+    const stage =
+        stages[currentStage];
 
-    if (
-        mode === "hard" &&
-        current ===
-        ring.fakeRotation
-    ) {
-        return true;
-    }
-
-    return false;
-}
-
-function isActuallyCorrect(index) {
-    const ring = rings[index];
-
-    return (
-        ring.confirmedRotation !== null &&
-        normalize(
-            ring.confirmedRotation
-        ) ===
-        ring.correctRotation
+    return getPatternCells(
+        stage.pattern,
+        stage.rotation
     );
 }
+
+
+// ======================================================
+// CZY AKTUALNY UKŁAD JEST NIEBIESKI
+// ======================================================
+
+function isCurrentPlacementValid() {
+    const stage =
+        stages[currentStage];
+
+    const rotation =
+        normalize(
+            stage.rotation
+        );
+
+
+    /*
+        Musi być jedną z dozwolonych
+        pozycji dla tego etapu.
+    */
+
+    if (
+        !stage.allowedRotations.includes(
+            rotation
+        )
+    ) {
+        return false;
+    }
+
+
+    const cells =
+        getCurrentCells();
+
+
+    /*
+        Wszystkie markery muszą leżeć
+        na pomarańczowych celach.
+    */
+
+    for (const cell of cells) {
+        const key =
+            cellKey(
+                cell.ring,
+                cell.slot
+            );
+
+        if (!targets.has(key)) {
+            return false;
+        }
+
+        /*
+            Nie wolno używać pola,
+            które już zostało zatwierdzone.
+        */
+
+        if (claimed.has(key)) {
+            return false;
+        }
+    }
+
+    return true;
+}
+
+
+// ======================================================
+// OBRACANIE CAŁEGO WYTRYCHA
+// ======================================================
 
 function rotateCurrent(direction) {
     if (gameOver) {
         return;
     }
 
-    const ring =
-        rings[currentRing];
+    const stage =
+        stages[currentStage];
 
-    ring.rotation =
+    stage.rotation =
         normalize(
-            ring.rotation +
+            stage.rotation +
             direction
         );
 
@@ -292,14 +715,21 @@ function rotateCurrent(direction) {
     draw();
 }
 
+
+// ======================================================
+// ZATWIERDZENIE
+// ======================================================
+
 function confirmCurrent() {
     if (gameOver) {
         return;
     }
 
-    if (!isBluePosition(currentRing)) {
+    if (
+        !isCurrentPlacementValid()
+    ) {
         status.textContent =
-            "Pierścień nie jest dopasowany.";
+            "Wszystkie elementy muszą być niebieskie.";
 
         status.style.color =
             COLORS.wrong;
@@ -307,36 +737,225 @@ function confirmCurrent() {
         return;
     }
 
-    rings[currentRing]
-        .confirmedRotation =
-        rings[currentRing]
-            .rotation;
+
+    const stage =
+        stages[currentStage];
+
+    const cells =
+        getCurrentCells();
+
+
+    stage.confirmedRotation =
+        stage.rotation;
+
+    stage.confirmedCells =
+        cells.map(cell => ({
+            ring: cell.ring,
+            slot: cell.slot
+        }));
+
+
+    /*
+        Zajmujemy cele.
+    */
+
+    for (const cell of cells) {
+        claimed.add(
+            cellKey(
+                cell.ring,
+                cell.slot
+            )
+        );
+    }
+
+
+    /*
+        Ostatni etap.
+    */
 
     if (
-        currentRing <
-        RINGS - 1
+        currentStage ===
+        STAGES - 1
     ) {
-        currentRing++;
-
-        status.textContent = "";
-
-        updateUI();
-        draw();
+        finishGame();
 
         return;
     }
 
-    checkSolution();
+
+    currentStage++;
+
+    updateUI();
+
+    status.textContent = "";
+
+    draw();
+
+
+    /*
+        HARD:
+        jeśli następny etap nie ma
+        żadnej możliwej pozycji,
+        od razu informujemy gracza,
+        że trzeba się cofnąć.
+    */
+
+    if (
+        mode === "hard" &&
+        !stageHasAnyValidPlacement(
+            currentStage
+        )
+    ) {
+        status.textContent =
+            "Ten układ nie pasuje. Cofnij i popraw poprzedni.";
+
+        status.style.color =
+            "#e89a32";
+    }
 }
 
-function checkSolution() {
-    const correct =
-        rings.every(
-            (_, index) =>
-                isActuallyCorrect(index)
-        );
 
-    if (correct) {
+// ======================================================
+// CZY ETAP MA JAKIEKOLWIEK DOPASOWANIE
+// ======================================================
+
+function stageHasAnyValidPlacement(
+    stageIndex
+) {
+    const stage =
+        stages[stageIndex];
+
+    for (
+        const rotation
+        of stage.allowedRotations
+    ) {
+        const cells =
+            getPatternCells(
+                stage.pattern,
+                rotation
+            );
+
+        let valid = true;
+
+        for (const cell of cells) {
+            const key =
+                cellKey(
+                    cell.ring,
+                    cell.slot
+                );
+
+            if (
+                !targets.has(key) ||
+                claimed.has(key)
+            ) {
+                valid = false;
+
+                break;
+            }
+        }
+
+        if (valid) {
+            return true;
+        }
+    }
+
+    return false;
+}
+
+
+// ======================================================
+// COFANIE
+// ======================================================
+
+function backStep() {
+    if (
+        gameOver ||
+        currentStage <= 0
+    ) {
+        return;
+    }
+
+
+    /*
+        Cofamy się do poprzedniego
+        zatwierdzonego układu.
+    */
+
+    currentStage--;
+
+
+    const stage =
+        stages[currentStage];
+
+
+    /*
+        Oddajemy pola poprzedniego
+        etapu.
+    */
+
+    for (
+        const cell
+        of stage.confirmedCells
+    ) {
+        claimed.delete(
+            cellKey(
+                cell.ring,
+                cell.slot
+            )
+        );
+    }
+
+
+    /*
+        Zostawiamy układ dokładnie
+        tam, gdzie był zatwierdzony,
+        żeby gracz mógł obrócić go
+        do drugiej niebieskiej pozycji.
+    */
+
+    if (
+        stage.confirmedRotation !==
+        null
+    ) {
+        stage.rotation =
+            stage.confirmedRotation;
+    }
+
+
+    stage.confirmedRotation =
+        null;
+
+    stage.confirmedCells =
+        [];
+
+
+    status.textContent =
+        "Cofnięto poprzedni wytrych.";
+
+    status.style.color =
+        "#e89a32";
+
+
+    updateUI();
+
+    draw();
+}
+
+
+// ======================================================
+// KONIEC
+// ======================================================
+
+function finishGame() {
+    /*
+        Wszystkie pomarańczowe pola
+        muszą zostać wykorzystane.
+    */
+
+    if (
+        claimed.size ===
+        targets.size
+    ) {
         gameOver = true;
 
         status.textContent =
@@ -350,50 +969,18 @@ function checkSolution() {
         return;
     }
 
-    if (mode === "hard") {
-        status.textContent =
-            "Układ nie pasuje. Cofnij się i popraw wcześniejszy pierścień.";
-
-        status.style.color =
-            "#e89a32";
-
-        return;
-    }
 
     status.textContent =
-        "BŁĘDNY UKŁAD";
-
-    status.style.color =
-        COLORS.wrong;
-}
-
-function backStep() {
-    if (
-        gameOver ||
-        currentRing <= 0
-    ) {
-        return;
-    }
-
-    rings[currentRing]
-        .confirmedRotation =
-        null;
-
-    currentRing--;
-
-    rings[currentRing]
-        .confirmedRotation =
-        null;
-
-    status.textContent =
-        "Cofnięto.";
+        "Nie wszystkie pola zostały rozwiązane. Cofnij.";
 
     status.style.color =
         "#e89a32";
-
-    updateUI();
-    draw();
 }
+
+
+// ======================================================
+// CANVAS HD
+// ======================================================
 
 function resizeCanvas() {
     const rect =
@@ -405,6 +992,7 @@ function resizeCanvas() {
             2
         );
 
+
     canvas.width =
         Math.round(
             rect.width * dpr
@@ -415,6 +1003,7 @@ function resizeCanvas() {
             rect.height * dpr
         );
 
+
     ctx.setTransform(
         dpr,
         0,
@@ -424,17 +1013,26 @@ function resizeCanvas() {
         0
     );
 
-    ctx.imageSmoothingEnabled = true;
-    ctx.imageSmoothingQuality = "high";
+
+    ctx.imageSmoothingEnabled =
+        true;
+
+    ctx.imageSmoothingQuality =
+        "high";
+
 
     draw();
 }
 
+
+// ======================================================
+// TOR
+// ======================================================
+
 function drawTrack(
     cx,
     cy,
-    radius,
-    active
+    radius
 ) {
     ctx.beginPath();
 
@@ -447,17 +1045,15 @@ function drawTrack(
     );
 
     ctx.strokeStyle =
-        active
-            ? COLORS.track
-            : COLORS.inactive;
+        COLORS.inactive;
 
-    ctx.lineWidth =
-        active ? 2.5 : 2;
+    ctx.lineWidth = 2;
 
     ctx.stroke();
 
+
     /*
-        Małe punkty toru.
+        drobne znaczniki
     */
 
     for (
@@ -467,9 +1063,9 @@ function drawTrack(
     ) {
         const angle =
             (i / SLOTS) *
-            Math.PI *
-            2 -
+            Math.PI * 2 -
             Math.PI / 2;
+
 
         const x =
             cx +
@@ -481,24 +1077,28 @@ function drawTrack(
             Math.sin(angle) *
             radius;
 
+
         ctx.beginPath();
 
         ctx.arc(
             x,
             y,
-            1.5,
+            1.4,
             0,
             Math.PI * 2
         );
 
         ctx.fillStyle =
-            active
-                ? "#34414c"
-                : "#242b33";
+            "#242b33";
 
         ctx.fill();
     }
 }
+
+
+// ======================================================
+// MARKER
+// ======================================================
 
 function drawMarker(
     cx,
@@ -512,9 +1112,9 @@ function drawMarker(
 ) {
     const angle =
         (slot / SLOTS) *
-        Math.PI *
-        2 -
+        Math.PI * 2 -
         Math.PI / 2;
+
 
     const x =
         cx +
@@ -526,24 +1126,35 @@ function drawMarker(
         Math.sin(angle) *
         radius;
 
+
     ctx.save();
+
 
     ctx.translate(
         x,
         y
     );
 
+
     ctx.rotate(
         angle +
         Math.PI / 2
     );
 
-    ctx.fillStyle = color;
 
-    ctx.shadowColor = color;
-    ctx.shadowBlur = glow;
+    ctx.fillStyle =
+        color;
+
+
+    ctx.shadowColor =
+        color;
+
+    ctx.shadowBlur =
+        glow;
+
 
     ctx.beginPath();
+
 
     ctx.roundRect(
         -width / 2,
@@ -553,110 +1164,17 @@ function drawMarker(
         3
     );
 
+
     ctx.fill();
+
 
     ctx.restore();
 }
 
-function drawRing(
-    cx,
-    cy,
-    index
-) {
-    const ring =
-        rings[index];
 
-    const radius =
-        RADII[index];
-
-    const active =
-        index === currentRing;
-
-    const confirmed =
-        index < currentRing &&
-        ring.confirmedRotation !== null;
-
-    drawTrack(
-        cx,
-        cy,
-        radius,
-        active
-    );
-
-    /*
-        Pomarańczowe cele pokazujemy
-        zawsze.
-    */
-
-    for (
-        const target
-        of ring.targets
-    ) {
-        drawMarker(
-            cx,
-            cy,
-            radius,
-            target,
-            COLORS.target,
-            3
-        );
-    }
-
-    /*
-        Ruchome elementy pokazujemy tylko:
-        - na aktualnym ring'u,
-        - albo na zatwierdzonym ring'u.
-    */
-
-    if (!active && !confirmed) {
-        return;
-    }
-
-    const blue =
-        active &&
-        isBluePosition(index);
-
-    for (
-        const offset
-        of ring.movingOffsets
-    ) {
-        const position =
-            normalize(
-                offset +
-                ring.rotation
-            );
-
-        let color =
-            COLORS.wrong;
-
-        let glow = 3;
-
-        if (blue) {
-            color =
-                COLORS.correct;
-
-            glow = 8;
-        }
-
-        if (confirmed) {
-            color =
-                COLORS.confirmed;
-
-            glow = 4;
-        }
-
-        drawMarker(
-            cx,
-            cy,
-            radius,
-            position,
-            color,
-            glow,
-            14,
-            7
-        );
-    }
-}
+// ======================================================
+// RYSOWANIE
+// ======================================================
 
 function draw() {
     const width =
@@ -665,12 +1183,14 @@ function draw() {
     const height =
         canvas.clientHeight;
 
+
     ctx.clearRect(
         0,
         0,
         width,
         height
     );
+
 
     ctx.fillStyle =
         "#07070b";
@@ -682,23 +1202,112 @@ function draw() {
         height
     );
 
+
     const cx =
         width * 0.49;
 
     const cy =
         height * 0.5;
 
+
+    /*
+        tory
+    */
+
     for (
-        let i = 0;
-        i < RINGS;
-        i++
+        let ring = 0;
+        ring < RINGS;
+        ring++
     ) {
-        drawRing(
+        drawTrack(
             cx,
             cy,
-            i
+            RADII[ring]
         );
     }
+
+
+    /*
+        POMARAŃCZOWE + ZIELONE CELE
+    */
+
+    for (
+        const key
+        of targets
+    ) {
+        const [
+            ringText,
+            slotText
+        ] =
+            key.split(":");
+
+
+        const ring =
+            Number(ringText);
+
+        const slot =
+            Number(slotText);
+
+
+        const done =
+            claimed.has(key);
+
+
+        drawMarker(
+            cx,
+            cy,
+            RADII[ring],
+            slot,
+
+            done
+                ? COLORS.confirmed
+                : COLORS.target,
+
+            done ? 5 : 3
+        );
+    }
+
+
+    /*
+        AKTUALNY WYTRYCH
+
+        Jest na kilku pierścieniach naraz.
+    */
+
+    if (!gameOver) {
+        const currentCells =
+            getCurrentCells();
+
+        const blue =
+            isCurrentPlacementValid();
+
+
+        for (
+            const cell
+            of currentCells
+        ) {
+            drawMarker(
+                cx,
+                cy,
+                RADII[cell.ring],
+                cell.slot,
+
+                blue
+                    ? COLORS.correct
+                    : COLORS.wrong,
+
+                blue ? 9 : 4,
+
+                14,
+                7
+            );
+        }
+    }
+
+
+    /*
+        ŚRODEK
+    */
 
     ctx.beginPath();
 
@@ -710,10 +1319,12 @@ function draw() {
         Math.PI * 2
     );
 
+
     ctx.fillStyle =
         "#101721";
 
     ctx.fill();
+
 
     ctx.strokeStyle =
         "#26394a";
@@ -721,6 +1332,7 @@ function draw() {
     ctx.lineWidth = 2;
 
     ctx.stroke();
+
 
     ctx.fillStyle =
         "#ffffff";
@@ -734,68 +1346,96 @@ function draw() {
     ctx.textBaseline =
         "middle";
 
+
     ctx.fillText(
-        `${currentRing + 1}/${RINGS}`,
+        `${currentStage + 1}/${STAGES}`,
         cx,
         cy
     );
 }
+
+
+// ======================================================
+// TIMER
+// ======================================================
 
 function updateTimer(now) {
     if (gameOver) {
         return;
     }
 
+
     const elapsed =
-        now - startTime;
+        now -
+        startTime;
+
 
     const remaining =
         Math.max(
             0,
-            gameTime - elapsed
+            gameTime -
+            elapsed
         );
+
 
     const percent =
         remaining /
         gameTime *
         100;
 
+
     timerBar.style.width =
         `${percent}%`;
 
-    if (remaining <= 0) {
+
+    if (
+        remaining <= 0
+    ) {
         lives--;
+
 
         livesText.textContent =
             lives;
 
-        if (lives <= 0) {
+
+        if (
+            lives <= 0
+        ) {
             gameOver = true;
+
 
             timerBar.style.width =
                 "0%";
 
+
             status.textContent =
                 "FAILED";
+
 
             status.style.color =
                 COLORS.wrong;
 
+
             return;
         }
+
 
         status.textContent =
             "Straciłeś wytrych";
 
+
         status.style.color =
             "#e89a32";
+
 
         startTime =
             performance.now();
 
+
         timerBar.style.width =
             "100%";
     }
+
 
     timerAnimation =
         requestAnimationFrame(
@@ -803,36 +1443,52 @@ function updateTimer(now) {
         );
 }
 
+
+// ======================================================
+// BUTTONY
+// ======================================================
+
 easyButton.addEventListener(
     "click",
     () => {
         mode = "easy";
+
         setupGame();
     }
 );
+
 
 hardButton.addEventListener(
     "click",
     () => {
         mode = "hard";
+
         setupGame();
     }
 );
+
 
 confirmButton.addEventListener(
     "click",
     confirmCurrent
 );
 
+
 backStepButton.addEventListener(
     "click",
     backStep
 );
 
+
 restartButton.addEventListener(
     "click",
     setupGame
 );
+
+
+// ======================================================
+// KLAWIATURA
+// ======================================================
 
 window.addEventListener(
     "keydown",
@@ -845,6 +1501,7 @@ window.addEventListener(
             rotateCurrent(-1);
         }
 
+
         if (
             event.key === "d" ||
             event.key === "D" ||
@@ -853,6 +1510,7 @@ window.addEventListener(
             rotateCurrent(1);
         }
 
+
         if (
             event.code === "Space"
         ) {
@@ -860,6 +1518,7 @@ window.addEventListener(
 
             confirmCurrent();
         }
+
 
         if (
             event.key === "z" ||
@@ -870,9 +1529,11 @@ window.addEventListener(
     }
 );
 
+
 window.addEventListener(
     "resize",
     resizeCanvas
 );
+
 
 setupGame();
