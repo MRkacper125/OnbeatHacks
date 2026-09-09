@@ -34,6 +34,10 @@ const timerBar =
 const status =
     document.getElementById("status");
 
+document.addEventListener("dragstart", event => {
+    event.preventDefault();
+});
+
 const timeInput =
     document.getElementById("timeInput");
 
@@ -192,12 +196,13 @@ function getCenter(element) {
 }
 
 function startDrag(event) {
+    event.preventDefault();
+
     if (gameOver) {
         return;
     }
 
-    const leftPoint =
-        event.currentTarget;
+    const leftPoint = event.currentTarget;
 
     const alreadyConnected =
         connections.some(
@@ -214,6 +219,8 @@ function startDrag(event) {
         mouseX: event.clientX,
         mouseY: event.clientY
     };
+
+    document.body.style.cursor = "crosshair";
 }
 
 window.addEventListener(
@@ -258,6 +265,8 @@ window.addEventListener(
         }
 
         dragging = null;
+        
+        document.body.style.cursor = "default";
 
         draw();
     }
