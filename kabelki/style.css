@@ -246,3 +246,59 @@ body {
     font-size: 16px;
     font-weight: bold;
 }
+
+.game-area {
+    user-select: none;
+    -webkit-user-select: none;
+    touch-action: none;
+}
+
+.point {
+    user-select: none;
+    -webkit-user-select: none;
+    -webkit-user-drag: none;
+    touch-action: none;
+}
+
+#wireCanvas {
+    user-select: none;
+    -webkit-user-select: none;
+    touch-action: none;
+}
+
+.back-button {
+    position: fixed;
+
+    top: 20px;
+    left: 20px;
+
+    z-index: 20;
+
+    padding: 10px 16px;
+
+    background: #020a05;
+    color: #00b84f;
+
+    border: 1px solid #00a844;
+    border-radius: 6px;
+
+    font-family: monospace;
+    font-size: 14px;
+    font-weight: bold;
+
+    text-decoration: none;
+
+    box-shadow:
+        0 0 5px rgba(0, 184, 79, 0.35);
+
+    transition: 0.2s;
+}
+
+.back-button:hover {
+    background: #003016;
+
+    box-shadow:
+        0 0 10px rgba(0, 184, 79, 0.7);
+
+    transform: translateX(-3px);
+}
