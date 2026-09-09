@@ -7,7 +7,7 @@
 
     <title>Kabelki - OnbeatHacks</title>
 
-    <link rel="stylesheet" href="./style.css?v=20">
+    <link rel="stylesheet" href="./style.css?v=30">
 </head>
 
 <body>
@@ -19,25 +19,68 @@
             <p>Połącz pasujące przewody.</p>
         </div>
 
+        <div class="settings-panel">
+
+            <label>
+                Czas
+                <input
+                    id="timeInput"
+                    type="number"
+                    min="5"
+                    max="120"
+                    value="15"
+                >
+                s
+            </label>
+
+            <label>
+                Kabelki
+                <input
+                    id="wireCountInput"
+                    type="number"
+                    min="3"
+                    max="12"
+                    value="5"
+                >
+            </label>
+
+            <button id="restartButton">
+                RESTART
+            </button>
+
+        </div>
+
         <div class="game-area" id="gameArea">
 
             <canvas id="wireCanvas"></canvas>
 
-            <div class="column left-column" id="leftColumn"></div>
+            <div
+                class="column left-column"
+                id="leftColumn"
+            ></div>
 
-            <div class="column right-column" id="rightColumn"></div>
+            <div
+                class="column right-column"
+                id="rightColumn"
+            ></div>
 
         </div>
 
         <div class="timer-background">
-            <div id="timerBar" class="timer-bar"></div>
+            <div
+                id="timerBar"
+                class="timer-bar"
+            ></div>
         </div>
 
-        <div id="status" class="status"></div>
+        <div
+            id="status"
+            class="status"
+        ></div>
 
     </div>
 
-    <script src="./script.js?v=20"></script>
+    <script src="./script.js?v=30"></script>
 
 </body>
 
