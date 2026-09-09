@@ -1,294 +1,223 @@
-const colors = [
-    {
-        name: "red",
-        color: "#d33b3b"
-    },
-    {
-        name: "blue",
-        color: "#2f6fd6"
-    },
-    {
-        name: "yellow",
-        color: "#d5a900"
-    },
-    {
-        name: "green",
-        color: "#1fa85b"
-    },
-    {
-        name: "orange",
-        color: "#c7661d"
-    }
+const COLORS = [
+    { id: "red", value: "#d43c3c" },
+    { id: "blue", value: "#316bd3" },
+    { id: "yellow", value: "#d5a800" },
+    { id: "green", value: "#1e9f56" },
+    { id: "orange", value: "#c7651b" }
 ];
 
-const leftPointsContainer =
-    document.getElementById("leftPoints");
+const leftColumn = document.getElementById("leftColumn");
+const rightColumn = document.getElementById("rightColumn");
 
-const rightPointsContainer =
-    document.getElementById("rightPoints");
+const canvas = document.getElementById("wireCanvas");
+const ctx = canvas.getContext("2d");
 
-const canvas =
-    document.getElementById("wiresCanvas");
+const gameArea = document.getElementById("gameArea");
 
-const ctx =
-    canvas.getContext("2d");
-
-const timerBar =
-    document.getElementById("timerBar");
-
-const result =
-    document.getElementById("result");
+const timerBar = document.getElementById("timerBar");
+const status = document.getElementById("status");
 
 let connections = [];
 
 let dragging = null;
 
-let gameFinished = false;
+let gameOver = false;
 
-const gameTime = 15000;
+const GAME_TIME = 15000;
 
-let startTime = Date.now();
+let startTime = performance.now();
 
 function shuffle(array) {
     const copy = [...array];
 
-    for (
-        let i = copy.length - 1;
-        i > 0;
-        i--
-    ) {
-        const j =
-            Math.floor(
-                Math.random() * (i + 1)
-            );
+    for (let i = copy.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
 
-        [
-            copy[i],
-            copy[j]
-        ] = [
-            copy[j],
-            copy[i]
-        ];
+        [copy[i], copy[j]] = [copy[j], copy[i]];
     }
 
     return copy;
 }
 
-function createPoint(colorData, side) {
-    const point =
-        document.createElement("div");
+function createPoint(color, side) {
+    const point = document.createElement("div");
 
-    point.className = "point";
+    point.classList.add("point");
 
-    point.dataset.color =
-        colorData.name;
+    point.dataset.color = color.id;
+    point.dataset.side = side;
 
-    point.dataset.side =
-        side;
+    point.style.background = color.value;
+    point.style.color = color.value;
 
-    point.style.background =
-        colorData.color;
-
-    point.style.color =
-        colorData.color;
-
-    point.addEventListener(
-        "pointerdown",
-        startDragging
-    );
-
-    point.addEventListener(
-        "pointerup",
-        stopDragging
-    );
+    if (side === "left") {
+        point.addEventListener("pointerdown", startDrag);
+    }
 
     return point;
 }
 
-function createPoints() {
-    leftPointsContainer.innerHTML = "";
-    rightPointsContainer.innerHTML = "";
+function createGame() {
+    leftColumn.innerHTML = "";
+    rightColumn.innerHTML = "";
 
-    const shuffledRight =
-        shuffle(colors);
-
-    for (const color of colors) {
-        leftPointsContainer.appendChild(
-            createPoint(
-                color,
-                "left"
-            )
+    for (const color of COLORS) {
+        leftColumn.appendChild(
+            createPoint(color, "left")
         );
     }
 
-    for (const color of shuffledRight) {
-        rightPointsContainer.appendChild(
-            createPoint(
-                color,
-                "right"
-            )
+    const shuffled = shuffle(COLORS);
+
+    for (const color of shuffled) {
+        rightColumn.appendChild(
+            createPoint(color, "right")
         );
     }
 }
 
 function resizeCanvas() {
-    const rect =
-        canvas.parentElement.getBoundingClientRect();
+    const rect = gameArea.getBoundingClientRect();
 
-    canvas.width =
-        rect.width;
-
-    canvas.height =
-        rect.height;
+    canvas.width = rect.width;
+    canvas.height = rect.height;
 
     draw();
 }
 
-function getPointCenter(element) {
-    const canvasRect =
-        canvas.getBoundingClientRect();
-
-    const rect =
-        element.getBoundingClientRect();
+function getCenter(element) {
+    const canvasRect = canvas.getBoundingClientRect();
+    const rect = element.getBoundingClientRect();
 
     return {
-        x:
-            rect.left -
-            canvasRect.left +
-            rect.width / 2,
-
-        y:
-            rect.top -
-            canvasRect.top +
-            rect.height / 2
+        x: rect.left - canvasRect.left + rect.width / 2,
+        y: rect.top - canvasRect.top + rect.height / 2
     };
 }
 
-function startDragging(event) {
-    if (gameFinished) {
+function startDrag(event) {
+    if (gameOver) {
         return;
     }
 
-    const point =
-        event.currentTarget;
+    const leftPoint = event.currentTarget;
 
-    if (
-        point.dataset.side !== "left"
-    ) {
-        return;
-    }
+    const alreadyConnected = connections.some(
+        connection => connection.left === leftPoint
+    );
 
-    const alreadyUsed =
-        connections.some(
-            connection =>
-                connection.left === point
-        );
-
-    if (alreadyUsed) {
+    if (alreadyConnected) {
         return;
     }
 
     dragging = {
-        left: point,
-        x: event.clientX,
-        y: event.clientY
+        left: leftPoint,
+        mouseX: event.clientX,
+        mouseY: event.clientY
     };
 
-    point.setPointerCapture(
-        event.pointerId
-    );
+    leftPoint.setPointerCapture(event.pointerId);
 }
 
-window.addEventListener(
-    "pointermove",
-    event => {
-        if (!dragging) {
-            return;
-        }
-
-        dragging.x =
-            event.clientX;
-
-        dragging.y =
-            event.clientY;
-
-        draw();
-    }
-);
-
-function stopDragging(event) {
-    if (!dragging) {
+window.addEventListener("pointermove", event => {
+    if (!dragging || gameOver) {
         return;
     }
 
-    const target =
-        document.elementFromPoint(
-            event.clientX,
-            event.clientY
-        );
+    dragging.mouseX = event.clientX;
+    dragging.mouseY = event.clientY;
+
+    draw();
+});
+
+window.addEventListener("pointerup", event => {
+    if (!dragging || gameOver) {
+        return;
+    }
+
+    const target = document.elementFromPoint(
+        event.clientX,
+        event.clientY
+    );
 
     if (
         target &&
         target.classList.contains("point") &&
         target.dataset.side === "right"
     ) {
-        const leftColor =
-            dragging.left.dataset.color;
-
-        const rightColor =
-            target.dataset.color;
-
-        const rightAlreadyUsed =
-            connections.some(
-                connection =>
-                    connection.right === target
-            );
-
-        if (
-            leftColor === rightColor &&
-            !rightAlreadyUsed
-        ) {
-            connections.push({
-                left: dragging.left,
-                right: target,
-                color:
-                    dragging.left.style.background
-            });
-
-            checkWin();
-        }
+        tryConnection(
+            dragging.left,
+            target
+        );
     }
 
     dragging = null;
 
     draw();
+});
+
+function tryConnection(leftPoint, rightPoint) {
+    const sameColor =
+        leftPoint.dataset.color === rightPoint.dataset.color;
+
+    const rightAlreadyConnected =
+        connections.some(
+            connection => connection.right === rightPoint
+        );
+
+    if (!sameColor || rightAlreadyConnected) {
+        status.textContent = "Błędne połączenie";
+        status.style.color = "#ff4040";
+
+        setTimeout(() => {
+            if (!gameOver) {
+                status.textContent = "";
+            }
+        }, 600);
+
+        return;
+    }
+
+    const color =
+        leftPoint.style.backgroundColor;
+
+    connections.push({
+        left: leftPoint,
+        right: rightPoint,
+        color: color
+    });
+
+    leftPoint.classList.add("connected");
+    rightPoint.classList.add("connected");
+
+    status.textContent = "";
+
+    if (connections.length === COLORS.length) {
+        winGame();
+    }
 }
 
-function drawLine(
-    start,
-    end,
-    color
-) {
+function drawCable(start, end, color) {
     ctx.beginPath();
 
-    ctx.moveTo(
-        start.x,
-        start.y
-    );
+    ctx.moveTo(start.x, start.y);
 
-    ctx.lineTo(
+    const middleX =
+        start.x + (end.x - start.x) / 2;
+
+    ctx.bezierCurveTo(
+        middleX,
+        start.y,
+        middleX,
+        end.y,
         end.x,
         end.y
     );
 
-    ctx.strokeStyle =
-        color;
-
+    ctx.strokeStyle = color;
     ctx.lineWidth = 5;
 
-    ctx.shadowColor =
-        color;
-
+    ctx.shadowColor = color;
     ctx.shadowBlur = 8;
 
     ctx.stroke();
@@ -304,21 +233,11 @@ function draw() {
         canvas.height
     );
 
-    for (
-        const connection
-        of connections
-    ) {
-        const start =
-            getPointCenter(
-                connection.left
-            );
+    for (const connection of connections) {
+        const start = getCenter(connection.left);
+        const end = getCenter(connection.right);
 
-        const end =
-            getPointCenter(
-                connection.right
-            );
-
-        drawLine(
+        drawCable(
             start,
             end,
             connection.color
@@ -327,90 +246,77 @@ function draw() {
 
     if (dragging) {
         const start =
-            getPointCenter(
-                dragging.left
-            );
+            getCenter(dragging.left);
 
-        const rect =
+        const canvasRect =
             canvas.getBoundingClientRect();
 
         const end = {
-            x:
-                dragging.x -
-                rect.left,
-
-            y:
-                dragging.y -
-                rect.top
+            x: dragging.mouseX - canvasRect.left,
+            y: dragging.mouseY - canvasRect.top
         };
 
-        drawLine(
+        drawCable(
             start,
             end,
-            dragging.left.style.background
+            dragging.left.style.backgroundColor
         );
     }
 }
 
-function checkWin() {
-    if (
-        connections.length ===
-        colors.length
-    ) {
-        gameFinished = true;
+function winGame() {
+    gameOver = true;
 
-        result.textContent =
-            "SUCCESS";
+    dragging = null;
 
-        result.style.color =
-            "#00d86b";
-    }
+    status.textContent = "SUCCESS";
+    status.style.color = "#00d56a";
+
+    draw();
 }
 
-function updateTimer() {
-    if (gameFinished) {
+function failGame() {
+    gameOver = true;
+
+    dragging = null;
+
+    timerBar.style.width = "0%";
+
+    status.textContent = "FAILED";
+    status.style.color = "#ff4040";
+
+    draw();
+}
+
+function updateTimer(now) {
+    if (gameOver) {
         return;
     }
 
     const elapsed =
-        Date.now() - startTime;
+        now - startTime;
 
     const remaining =
         Math.max(
             0,
-            gameTime - elapsed
+            GAME_TIME - elapsed
         );
 
-    const percent =
-        remaining /
-        gameTime *
-        100;
+    const percentage =
+        remaining / GAME_TIME * 100;
 
     timerBar.style.width =
-        percent + "%";
+        percentage + "%";
 
     if (remaining <= 0) {
-        gameFinished = true;
-
-        dragging = null;
-
-        result.textContent =
-            "FAILED";
-
-        result.style.color =
-            "#ff4040";
-
-        draw();
-
+        failGame();
         return;
     }
 
-    requestAnimationFrame(
-        updateTimer
-    );
+    requestAnimationFrame(updateTimer);
 }
 
-createPoints();
+createGame();
 
 resizeCanvas();
 
@@ -419,6 +325,4 @@ window.addEventListener(
     resizeCanvas
 );
 
-requestAnimationFrame(
-    updateTimer
-);
+requestAnimationFrame(updateTimer);

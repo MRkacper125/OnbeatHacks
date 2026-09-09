@@ -7,36 +7,37 @@
 
     <title>Kabelki - OnbeatHacks</title>
 
-    <link rel="stylesheet" href="style.css?v=1">
+    <link rel="stylesheet" href="style.css?v=2">
 </head>
 
 <body>
 
     <div class="hack-panel">
 
-        <div class="header">
-            <h2> test </h2>
+        <div class="hack-header">
+            <h2>Odpalanie pojazdu</h2>
+            <p>Połącz pasujące przewody.</p>
+        </div>
+
+        <div class="game-area" id="gameArea">
+
+            <canvas id="wireCanvas"></canvas>
+
+            <div class="column left-column" id="leftColumn"></div>
+
+            <div class="column right-column" id="rightColumn"></div>
 
         </div>
 
-        <div class="game-area">
-
-            <canvas id="wiresCanvas"></canvas>
-
-            <div id="leftPoints" class="points left-points"></div>
-            <div id="rightPoints" class="points right-points"></div>
-
-        </div>
-
-        <div class="timer-track">
+        <div class="timer-background">
             <div id="timerBar" class="timer-bar"></div>
         </div>
 
-        <div id="result" class="result"></div>
+        <div id="status" class="status"></div>
 
     </div>
 
-    <script src="script.js?v=1"></script>
+    <script src="script.js?v=2"></script>
 
 </body>
 
