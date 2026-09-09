@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="pl">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <title>Wytrych - OnbeatHacks</title>
+
+    <link rel="stylesheet" href="./style.css?v=2">
+</head>
+
+<body>
+
+    <a href="../" class="back-button">← POWRÓT</a>
+
+    <div class="lock-panel">
+
+        <div class="top-bar">
+
+            <div>
+                <h2>Wytrych</h2>
+                <p>Dopasuj pierścienie do pomarańczowych pól.</p>
+            </div>
+
+            <div class="right-settings">
+
+                <div class="time-setting">
+                    <label for="timeInput">Czas</label>
+
+                    <input
+                        id="timeInput"
+                        type="number"
+                        min="5"
+                        max="120"
+                        value="15"
+                    >
+
+                    <span>s</span>
+                </div>
+
+                <div class="mode-buttons">
+
+                    <button
+                        id="easyButton"
+                        class="mode-button active"
+                    >
+                        EASY
+                    </button>
+
+                    <button
+                        id="hardButton"
+                        class="mode-button"
+                    >
+                        HARD
+                    </button>
+
+                </div>
+
+            </div>
+
+        </div>
+
+        <div class="game-wrapper">
+
+            <canvas id="lockCanvas"></canvas>
+
+            <div class="side-panel">
+
+                <div class="info-box">
+                    <span>Etap</span>
+                    <strong id="stageText">1/5</strong>
+                </div>
+
+                <div class="info-box">
+                    <span>Wytrychy</span>
+                    <strong id="livesText">3</strong>
+                </div>
+
+                <button id="confirmButton">
+                    SPACE / SPRAWDŹ
+                </button>
+
+                <button id="backStepButton">
+                    COFNIJ
+                </button>
+
+                <button id="restartButton">
+                    RESTART
+                </button>
+
+            </div>
+
+        </div>
+
+        <div class="controls">
+            A / ← = lewo
+            &nbsp;&nbsp;
+            D / → = prawo
+            &nbsp;&nbsp;
+            SPACE = zatwierdź
+            &nbsp;&nbsp;
+            Z = cofnij
+        </div>
+
+        <div class="timer-track">
+            <div id="timerBar" class="timer-bar"></div>
+        </div>
+
+        <div id="status" class="status"></div>
+
+    </div>
+
+    <script src="./script.js?v=2"></script>
+
+</body>
+
+</html>
