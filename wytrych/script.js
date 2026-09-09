@@ -219,17 +219,21 @@ function createRing(index) {
     if (mode === "hard") {
 
         fakeRotation =
-            randomInt(SLOTS);
+            normalize(
+                correctRotation +
+                Math.floor(SLOTS / 2)
+            );
 
-        while (
-            fakeRotation === correctRotation ||
-            fakeRotation === rotation
+        if (
+            fakeRotation ===
+            correctRotation
         ) {
             fakeRotation =
-                randomInt(SLOTS);
+                normalize(
+                    correctRotation + 1
+                );
         }
     }
-
 
     return {
         targets,
@@ -325,30 +329,42 @@ function updateUI() {
 // ==========================
 
 function isBluePosition(index) {
+    const ring = rings[index];
 
-    const ring =
-        rings[index];
+    const movedPositions =
+        ring.movingOffsets.map(offset =>
+            normalize(
+                offset + ring.rotation
+            )
+        );
 
-    const position =
-        normalize(ring.rotation);
+    const targets =
+        [...ring.targets].sort(
+            (a, b) => a - b
+        );
 
+    const moved =
+        [...movedPositions].sort(
+            (a, b) => a - b
+        );
 
-    if (
-        position ===
-        ring.correctRotation
-    ) {
+    const perfectMatch =
+        targets.length === moved.length &&
+        targets.every(
+            (value, i) =>
+                value === moved[i]
+        );
+
+    if (perfectMatch) {
         return true;
     }
 
-
-    if (
-        mode === "hard" &&
-        position ===
-        ring.fakeRotation
-    ) {
-        return true;
+    if (mode === "hard") {
+        return (
+            normalize(ring.rotation) ===
+            ring.fakeRotation
+        );
     }
-
 
     return false;
 }
