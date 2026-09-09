@@ -34,9 +34,7 @@ const timerBar =
 const status =
     document.getElementById("status");
 
-document.addEventListener("dragstart", event => {
-    event.preventDefault();
-});
+
 
 const timeInput =
     document.getElementById("timeInput");

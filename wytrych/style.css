@@ -192,8 +192,10 @@ body {
 
     background: #07070b;
 
-    border: 1px solid #1e1e2b;
+    border: 1px solid #1c2230;
     border-radius: 6px;
+
+    display: block;
 }
 
 .side-panel {
